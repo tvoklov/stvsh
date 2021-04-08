@@ -1,0 +1,9 @@
+/.bsp/
+/.idea/
+/backend/target/
+/commons/target/
+/frontend/api/target/
+/target/
+/project/target/
+/project/project/target/
+/frontend/webui/target/
