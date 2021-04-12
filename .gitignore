@@ -1,9 +1,14 @@
 /.bsp/
 /.idea/
-/backend/target/
-/commons/target/
-/frontend/api/target/
+
+# sbt loves these
 /target/
+/backend/target/
 /project/target/
 /project/project/target/
+/commons/target/
+/frontend/api/target/
 /frontend/webui/target/
+
+*.class
+*.log

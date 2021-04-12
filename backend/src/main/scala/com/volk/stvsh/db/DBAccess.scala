@@ -1,27 +1,61 @@
 package com.volk.stvsh.db
 
-import cats._
 import cats.effect._
-import cats.implicits._
+import com.volk.stvsh.BackendConfig.config
+import com.volk.stvsh.db.objects.folder.Access.AccessType.AccessType
+import com.volk.stvsh.db.Aliases._
+import com.volk.stvsh.db.objects.folder.Folder
+import com.volk.stvsh.db.objects.{ Sheet, User }
 import doobie._
 import doobie.implicits._
+import doobie.util.transactor.Transactor.Aux
 
 object DBAccess {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContexts.synchronous)
 
-  val xa = Transactor.fromDriverManager[IO](
-    "org.postgresql.Driver",     // driver classname
-    "jdbc:postgresql://localhost:5432/jilfond",     // connect URL (driver-specific)
-    "postgres",                  // user
-    "postgres",                          // password
-    Blocker.liftExecutionContext(ExecutionContexts.synchronous) // just for testing
+  private val xa: Aux[IO, Unit] = Transactor.fromDriverManager[IO](
+    "org.postgresql.Driver",
+    config.database.url,
+    config.database.user,
+    config.database.password,
+    Blocker.liftExecutionContext(ExecutionContexts.synchronous)
   )
 
-  val p1 = sql"select id from address".query[Int].to[List]
+  def perform[T]: ConnectionIO[T] => IO[T] = _.transact(xa)
 
-  println(p1.transact(xa).unsafeRunSync())
+  implicit class ConnectionIODbAccess[T](io: ConnectionIO[T]) {
+    def perform: IO[T]   = DBAccess.perform(io)
+    def unsafeRunSync: T = DBAccess.perform(io).unsafeRunSync()
+  }
 
+  implicit class IdDbAccess(id: ID) {
+    def getFolder: ConnectionIO[Option[Folder]] = Folder.get(id)
+    def getUser: ConnectionIO[Option[User]]     = User.get(id)
+    def getSheet: ConnectionIO[Option[Sheet]]   = Sheet.get(id)
+  }
 
+  implicit class FolderDbAccess(folder: Folder) {
+    def save: ConnectionIO[Int]                                = Folder.save(folder)
+    def delete: ConnectionIO[Int]                              = Folder.delete(folder)
+    def getOwner: ConnectionIO[Option[User]]                   = User.get(folder.ownerId)
+    def getUsers: ConnectionIO[List[(User, List[AccessType])]] = Folder.getUsers(folder)
+    def getSheets(offset: Option[Long] = None, limit: Option[Long] = None): ConnectionIO[List[Sheet]] =
+      Sheet.findBy(Some(folder.id), offset, limit)
+    def allow(user: User, accessTypes: List[AccessType]): ConnectionIO[Int] =
+      Folder.allowAccess(user, accessTypes = accessTypes)(folder)
+  }
+
+  implicit class SheetDbAccess(sheet: Sheet) {
+    def save: ConnectionIO[Int]   = Sheet.save(sheet)
+    def delete: ConnectionIO[Int] = Sheet.delete(sheet)
+  }
+
+  implicit class UserDbAccess(user: User) {
+    def save: ConnectionIO[Int]                          = User.save(user)
+    def delete: ConnectionIO[Int]                        = User.delete(user)
+    def getOwnedFolders: ConnectionIO[List[Folder]]      = Folder.findBy(ownerId = Some(user.id))
+    def getAccessibleFolders: ConnectionIO[List[Folder]] = Folder.findBy(ownerId = Some(user.id), userId = Some(user.id))
+  }
 
 }
