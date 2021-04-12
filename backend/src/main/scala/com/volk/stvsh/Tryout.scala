@@ -1,11 +1,13 @@
 package com.volk.stvsh
 
 import cats.effect.IO
-import com.volk.stvsh.db.{ Folder, Sheet, User }
-import com.volk.stvsh.db.Access.AccessType
+import com.volk.stvsh.db.objects.User
+import com.volk.stvsh.db.objects.folder.Access.AccessType
 import com.volk.stvsh.db.DBAccess._
-import com.volk.stvsh.db.Fields.{ Image, Text }
-import com.volk.stvsh.db.Schema.ValueType
+import com.volk.stvsh.db.objects.SheetField.{Image, Text}
+import com.volk.stvsh.db.objects.Sheet
+import com.volk.stvsh.db.objects.folder.Folder
+import com.volk.stvsh.db.objects.folder.Schema.ValueType
 
 object Tryout extends App {
 
@@ -45,7 +47,7 @@ object Tryout extends App {
 //  println(allowed)
 
   println(p1.unsafeRunSync())
-  println(p3.unsafeRunSync())
+//  println(p3.unsafeRunSync())
 
 
 }

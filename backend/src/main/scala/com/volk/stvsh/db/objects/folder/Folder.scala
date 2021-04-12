@@ -1,15 +1,16 @@
-package com.volk.stvsh.db
+package com.volk.stvsh.db.objects.folder
 
 import cats.free.Free
-import com.volk.stvsh.db.Access.AccessType.AccessType
 import com.volk.stvsh.db.Aliases._
-import com.volk.stvsh.db.Schema.FolderSchema
+import com.volk.stvsh.db.objects.{ asFragment, User }
+import com.volk.stvsh.db.objects.folder.Access.AccessType.AccessType
+import com.volk.stvsh.db.objects.folder.Schema.FolderSchema
 import com.volk.stvsh.extensions.CatsExtensions._
 import com.volk.stvsh.extensions.DoobieExtensions._
 import com.volk.stvsh.extensions.SqlUtils._
-import doobie.{ ConnectionIO, Fragment }
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
+import doobie.{ ConnectionIO, Fragment }
 import play.api.libs.json.{ Format, Json }
 
 import java.util.UUID
@@ -35,29 +36,23 @@ object Folder {
   def apply(name: String, owner: User, schema: FolderSchema): Folder =
     Folder(UUID.randomUUID().toString, name, owner.id, schema)
 
-  def get(id: String): doobie.ConnectionIO[Option[Folder]] = {
-    val sql =
-      sql"select ${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema} from " ++ Fragment.const(pgTable) ++
-        sql" where " ++ Fragment.const(fields.id) ++ sql" = $id"
+  private def toFolder: ((ID, String, ID, String)) => Folder = { case (id, name, userId, schemaJson) =>
+    Folder(id, name, userId, Json.parse(schemaJson).as[FolderSchema])
+  }
 
-    sql
+  def get: ID => ConnectionIO[Option[Folder]] =
+    CRUD
+      .select(_)
       .query[(ID, String, ID, String)]
       .option
-      .map(_.map { case (id, name, userId, schemaJson) =>
-        Folder(id, name, userId, Json.parse(schemaJson).as[FolderSchema])
-      })
+      .map(_.map(toFolder))
+
+  def save: Folder => ConnectionIO[Int] = { case f @ Folder(id, _, _, _) =>
+    get(id)
+      .flatMap(_.fold(CRUD.insert(f))(_ => CRUD.update(f)).update.run)
   }
 
-  def save: Folder => ConnectionIO[Int] = { case Folder(id, name, ownerId, schema) =>
-    val sql =
-      s"""
-         |insert into $pgTable
-         |(${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema})
-         |values('$id', '${name.fixForSql}', '$ownerId', '${Json.toJson(schema).toString().fixForSql}')
-         |""".stripMargin
-
-    Fragment.const(sql).update.run
-  }
+  def delete: Folder => ConnectionIO[Int] = CRUD.delete(_).update.run
 
   def findBy(
       ownerId: Option[String] = None,
@@ -86,7 +81,7 @@ object Folder {
       allow: Boolean = true,
       accessTypes: List[AccessType] = Nil,
   ): Folder => ConnectionIO[Int] = { case Folder(id, _, _, _) =>
-    val insert = Access.insert(id, user.id)
+    val insert = Access.CRUD.insert(id, user.id)
 
     Access
       .getFor(id, user.id)
@@ -101,7 +96,7 @@ object Folder {
           val (o, n) = accessTypes.partition(list.contains)
           val sql =
             if (allow) n.map(insert).combine
-            else Access.delete(id, user.id, o)
+            else Access.CRUD.delete(id, user.id, o)
 
           sql.update.run
       }
@@ -116,6 +111,38 @@ object Folder {
     val users = Access.getUsers(id)
 
     owner.flatMap(o => users.map(x => o.toList ++ x))
+  }
+
+  private object CRUD {
+    def select: ID => Fragment = asFragment compose { id =>
+      s"""
+         |select ${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema} from $pgTable
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
+
+    def update: Folder => Fragment = asFragment compose { case Folder(id, name, ownerId, schema) =>
+      s"""
+         |update $pgTable
+         |set ${fields.name} = '$name', ${fields.ownerId} = '$ownerId', ${fields.schema} = '${Json.toJson(schema).toString().fixForSql}'
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
+
+    def insert: Folder => Fragment = asFragment compose { case Folder(id, name, ownerId, schema) =>
+      s"""
+         |insert into $pgTable
+         |(${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema})
+         |values('$id', '${name.fixForSql}', '$ownerId', '${Json.toJson(schema).toString().fixForSql}')
+         |""".stripMargin
+    }
+
+    def delete: Folder => Fragment = asFragment compose { case Folder(id, _, _, _) =>
+      s"""
+         |delete from $pgTable
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
   }
 
   implicit val folderJson: Format[Folder] = Json.format
@@ -138,26 +165,24 @@ object Access {
     val write = "WRITE"
   }
 
-  def insert(folderId: ID, userId: ID): AccessType => Fragment =
-    accessType => {
-      val sql =
-        s"""
-           |insert into $pgTable
-           |(${fields.folderId}, ${fields.userId}, ${fields.accessType})
-           |values('$folderId', '$userId', '$accessType')
-           |""".stripMargin
-      Fragment.const(sql)
-    }
+  private[folder] object CRUD {
+    def insert(folderId: ID, userId: ID): AccessType => Fragment =
+      accessType =>
+        asFragment {
+          s"""
+             |insert into $pgTable
+             |(${fields.folderId}, ${fields.userId}, ${fields.accessType})
+             |values('$folderId', '$userId', '$accessType')
+             |""".stripMargin
+        }
 
-  def delete(folderId: ID, userId: ID, accessTypes: List[AccessType] = Nil): Fragment = {
-    val sql =
+    def delete(folderId: ID, userId: ID, accessTypes: List[AccessType] = Nil): Fragment = asFragment {
       s"""
          |delete from $pgTable
          |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId'
          |${accessTypes.mkString(s"and ${fields.accessType} in ('", "', '", "')")}
          |""".stripMargin
-
-    Fragment.const(sql)
+    }
   }
 
   def getFor(folderId: ID, userId: ID): doobie.ConnectionIO[List[AccessType]] = {
@@ -167,7 +192,7 @@ object Access {
          |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId'
          |""".stripMargin
 
-    Fragment.const(sql).query[AccessType].to[List]
+    asFragment(sql).query[AccessType].to[List]
   }
 
   def getUsers(id: ID): ConnectionIO[List[(User, List[AccessType])]] = {
@@ -177,8 +202,7 @@ object Access {
          |where folder_id = $id
          |""".stripMargin
 
-    Fragment
-      .const(sql)
+    asFragment(sql)
       .query[(ID, String)]
       .to[List]
       .flatMap(

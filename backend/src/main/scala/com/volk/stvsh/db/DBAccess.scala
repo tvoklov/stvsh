@@ -2,8 +2,10 @@ package com.volk.stvsh.db
 
 import cats.effect._
 import com.volk.stvsh.BackendConfig.config
-import com.volk.stvsh.db.Access.AccessType.AccessType
+import com.volk.stvsh.db.objects.folder.Access.AccessType.AccessType
 import com.volk.stvsh.db.Aliases._
+import com.volk.stvsh.db.objects.folder.Folder
+import com.volk.stvsh.db.objects.{Sheet, User}
 import doobie._
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux

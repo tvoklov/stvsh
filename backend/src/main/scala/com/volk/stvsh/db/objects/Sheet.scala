@@ -1,20 +1,13 @@
-package com.volk.stvsh.db
+package com.volk.stvsh.db.objects
 
-import cats.free.Free
 import com.volk.stvsh.db.Aliases._
-import com.volk.stvsh.db.DBAccess._
-import com.volk.stvsh.db.Fields.{ SheetField, _ }
-import com.volk.stvsh.db.Schema.{ Key, ValueType }
+import com.volk.stvsh.db.objects.SheetField.{ SheetField, _ }
+import com.volk.stvsh.db.objects.folder.Folder
+import com.volk.stvsh.db.objects.folder.Schema.{ Key, ValueType }
 import com.volk.stvsh.extensions.SqlUtils.SqlFixer
-import doobie._
-import doobie.free.connection
-import doobie.implicits._
-import doobie.util.fragment
-import doobie.util.fragment.Fragment
 import play.api.libs.json._
 
 import java.util.UUID
-import scala.util.Try
 
 case class Sheet(
     id: ID,
@@ -23,6 +16,10 @@ case class Sheet(
 )
 
 object Sheet {
+  import doobie._
+  import doobie.implicits._
+  import doobie.util.fragment.Fragment
+
   private[db] val pgTable = "sheet"
 
   private object fields {
@@ -34,56 +31,21 @@ object Sheet {
   def apply(folder: Folder, values: Map[Key, SheetField]): Sheet =
     Sheet(UUID.randomUUID().toString, folder.id, values)
 
+  private def toSheet: ((ID, String, ID)) => Sheet = { case (id, valuesJson, folderId) =>
+    Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
+  }
+
   def validate(folder: Folder): Sheet => Boolean =
     _.values.forall { case (key, v) =>
       folder.schema.get(key).contains(v.valueType)
     }
 
-  private def toSheet: ((ID, ID, Map[Key, SheetField])) => Sheet = { case (id, folderId, values) =>
-    Sheet(id, folderId, values)
-  }
-
-  def get(id: ID): Free[connection.ConnectionOp, Option[Sheet]] = {
-    val sql =
-      s"""
-         |select ${fields.id}, ${fields.values}, ${fields.folderId} from $pgTable
-         |where ${fields.id} = '$id'
-         |""".stripMargin
-
-    Fragment
-      .const(sql)
+  def get: ID => ConnectionIO[Option[Sheet]] =
+    CRUD
+      .select(_)
       .query[(ID, String, ID)]
       .option
-      .map(_.map { case (id, valuesJson, folderId) =>
-        (id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
-      }.map(toSheet))
-  }
-
-  def insert: Sheet => Fragment = { case Sheet(id, folderId, values) =>
-    val sql =
-      s"""
-         |insert into $pgTable
-         |(${fields.id}, ${fields.folderId}, ${fields.values})
-         |values('$id', '$folderId', '${Json.toJson(values).toString().fixForSql}')
-         |""".stripMargin
-
-    Fragment.const(sql)
-  }
-
-  def update: Sheet => Fragment = { case Sheet(id, _, values) =>
-    val sql =
-      s"""
-         |update $pgTable
-         |set ${fields.values} = ${Json.toJson(values).toString().fixForSql}
-         |where ${fields.id} = '$id'
-         |""".stripMargin
-
-    Fragment.const(sql)
-  }
-
-  def delete: Sheet => Fragment = { case Sheet(id, _, _) =>
-    sql"delete from " ++ Fragment.const(pgTable) ++ sql" where " ++ Fragment.const(fields.id) ++ sql" = $id"
-  }
+      .map(_.map(toSheet))
 
   def save(sheet: Sheet): ConnectionIO[Int] = {
     val check =
@@ -93,8 +55,10 @@ object Sheet {
     check
       .query[String]
       .option
-      .flatMap(_.fold(insert(sheet))(_ => update(sheet)).update.run)
+      .flatMap(_.fold(CRUD.insert(sheet))(_ => CRUD.update(sheet)).update.run)
   }
+
+  def delete: Sheet => ConnectionIO[Int] = CRUD.delete(_).update.run
 
   def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long]): ConnectionIO[List[Sheet]] = {
     val filters =
@@ -116,39 +80,46 @@ object Sheet {
          |$paging
          |""".stripMargin
 
-    Fragment
-      .const(sql)
+    asFragment(sql)
       .query[(ID, String, ID)]
       .to[List]
-      .map {
-        _.map { case (id, valuesJson, folderId) =>
-          (id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
-        }
-      }
       .map(_.map(toSheet))
   }
 
-  def parseSheet(folderId: ID, valuesJson: String): Free[connection.ConnectionOp, Option[Map[String, SheetField]]] =
-    folderId.getFolder.map(_.map { case Folder(_, _, _, schema) =>
-      Json
-        .parse(valuesJson)
-        .as[Map[String, String]]
-        .flatMap { case key -> value =>
-          schema
-            .get(key)
-            .flatMap {
-              case ValueType.text                => Some(Text(value))
-              case ValueType.image               => Some(Image(value))
-              case ValueType.wholeNumber         => value.toIntOption.map(WholeNumber(_))
-              case ValueType.floatingPointNumber => value.toFloatOption.map(FloatingPointNumber)
-              case ValueType.tags                => Try(Json.parse(value).as[List[String]]).toOption.map(Tags)
-            }
-            .map(key -> _)
-        }
-    })
+  private object CRUD {
+    def select: ID => Fragment = asFragment compose { id =>
+      s"""
+         |select ${fields.id}, ${fields.values}, ${fields.folderId} from $pgTable
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
+
+    def insert: Sheet => Fragment = asFragment compose { case Sheet(id, folderId, values) =>
+      s"""
+         |insert into $pgTable
+         |(${fields.id}, ${fields.folderId}, ${fields.values})
+         |values('$id', '$folderId', '${Json.toJson(values).toString().fixForSql}')
+         |""".stripMargin
+    }
+
+    def update: Sheet => Fragment = asFragment compose { case Sheet(id, _, values) =>
+      s"""
+         |update $pgTable
+         |set ${fields.values} = ${Json.toJson(values).toString().fixForSql}
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
+
+    def delete: Sheet => Fragment = { case Sheet(id, _, _) =>
+      sql"delete from " ++ Fragment.const(pgTable) ++
+        sql" where " ++ Fragment.const(fields.id) ++ sql" = $id"
+    }
+  }
+
+  implicit val sheetJson: Format[Sheet] = Json.format
 }
 
-object Fields {
+object SheetField {
   sealed trait SheetField {
     def valueType: ValueType
   }
@@ -168,7 +139,7 @@ object Fields {
     override def valueType: ValueType = ValueType.tags
   }
 
-  implicit val seetFieldFormat: Format[SheetField] = new Format[SheetField] {
+  implicit val sheetFieldFormat: Format[SheetField] = new Format[SheetField] {
     override def reads(json: JsValue): JsResult[SheetField] = {
       val type_ = json \ "type"
       val value = json \ "value"

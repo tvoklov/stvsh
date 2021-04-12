@@ -1,7 +1,8 @@
-package com.volk.stvsh.db
+package com.volk.stvsh.db.objects
 
 import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.extensions.SqlUtils.SqlFixer
+import play.api.libs.json.{ Format, Json }
 
 case class User(
     id: ID,
@@ -10,7 +11,6 @@ case class User(
 
 object User {
   import doobie._
-  import doobie.implicits._
 
   import java.util.UUID
 
@@ -27,16 +27,18 @@ object User {
     User(id, username)
   }
 
-  def get(id: String): doobie.ConnectionIO[Option[User]] = {
-    val sql =
-      sql"select ${fields.id}, ${fields.username} from " ++ Fragment.const(pgTable) ++
-        sql" where " ++ Fragment.const(fields.id) ++ sql" = $id"
-
-    sql
+  def get: ID => ConnectionIO[Option[User]] =
+    CRUD
+      .select(_)
       .query[(ID, String)]
       .option
       .map(_.map(toUser))
+
+  def save: User => ConnectionIO[Int] = { case u @ User(id, _) =>
+    get(id).flatMap(_.fold(CRUD.insert(u))(_ => CRUD.update(u)).update.run)
   }
+
+  def delete: User => ConnectionIO[Int] = CRUD.delete(_).update.run
 
   def findBy(username: Option[String]): ConnectionIO[List[User]] = {
     val filters =
@@ -57,15 +59,37 @@ object User {
       .map(_.map(toUser))
   }
 
-  def save: User => ConnectionIO[Int] = { case User(id, username) =>
-    val sql =
+  private object CRUD {
+    def select: ID => Fragment = asFragment compose { id =>
+      s"""
+         |select ${fields.id}, ${fields.username} from $pgTable
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
+
+    def insert: User => Fragment = asFragment compose { case User(id, username) =>
       s"""
          |insert into $pgTable
          |(${fields.id}, ${fields.username})
          |values('$id', '${username.fixForSql}')
          |""".stripMargin
+    }
 
-    Fragment.const(sql).update.run
+    def update: User => Fragment = asFragment compose { case User(id, username) =>
+      s"""
+         |update $pgTable
+         |set ${fields.username} = '$username'
+         |where ${fields.id} = '$id'
+         |""".stripMargin
+    }
+
+    def delete: User => Fragment = asFragment compose { case User(id, _) =>
+      s"""
+         |delete from $pgTable
+         |where id = '$id'
+         |""".stripMargin
+    }
   }
 
+  implicit val userJson: Format[User] = Json.format
 }

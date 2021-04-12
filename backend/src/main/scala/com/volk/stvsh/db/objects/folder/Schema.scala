@@ -1,4 +1,4 @@
-package com.volk.stvsh.db
+package com.volk.stvsh.db.objects.folder
 
 object Schema {
 
