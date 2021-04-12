@@ -37,6 +37,8 @@ object DBAccess {
 
   implicit class FolderDbAccess(folder: Folder) {
     def save: ConnectionIO[Int] = Folder.save(folder)
+    def delete: ConnectionIO[Int] = Folder.delete(folder)
+    def getOwner: ConnectionIO[Option[User]] = User.get(folder.ownerId)
     def getUsers: ConnectionIO[List[(User, List[AccessType])]] = Folder.getUsers(folder)
     def getSheets(offset: Option[Long] = None, limit: Option[Long] = None): ConnectionIO[List[Sheet]] =
       Sheet.findBy(Some(folder.id), offset, limit)
@@ -46,11 +48,14 @@ object DBAccess {
 
   implicit class SheetDbAccess(sheet: Sheet) {
     def save: ConnectionIO[Int] = Sheet.save(sheet)
+    def delete: ConnectionIO[Int] = Sheet.delete(sheet)
   }
 
   implicit class UserDbAccess(user: User) {
     def save: ConnectionIO[Int] = User.save(user)
+    def delete: ConnectionIO[Int] = User.delete(user)
     def getOwnedFolders: ConnectionIO[List[Folder]] = Folder.findBy(ownerId = Some(user.id))
+    def getAccessibleFolders: ConnectionIO[List[Folder]] = Folder.findBy(ownerId = Some(user.id), userId = Some(user.id))
   }
 
 }
