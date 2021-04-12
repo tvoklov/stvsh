@@ -79,9 +79,7 @@ lazy val backend = (project in file("backend"))
 lazy val api = (project in file("frontend/api"))
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Seq(
-      libraries.play
-    )
+    libraryDependencies += guice
   )
   .enablePlugins(PlayScala)
   .dependsOn(backend)
