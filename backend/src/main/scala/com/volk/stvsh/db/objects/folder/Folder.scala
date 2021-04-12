@@ -180,7 +180,7 @@ object Access {
       s"""
          |delete from $pgTable
          |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId'
-         |${accessTypes.mkString(s"and ${fields.accessType} in ('", "', '", "')")}
+         |${accessTypes.mkString(s" and ${fields.accessType} in ('", "', '", "')")}
          |""".stripMargin
     }
   }
@@ -199,7 +199,7 @@ object Access {
     val sql =
       s"""
          |select ${fields.userId}, ${fields.accessType} from $pgTable
-         |where folder_id = $id
+         |where folder_id = '$id'
          |""".stripMargin
 
     asFragment(sql)

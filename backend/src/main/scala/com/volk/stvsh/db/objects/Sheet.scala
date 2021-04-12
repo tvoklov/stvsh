@@ -105,14 +105,16 @@ object Sheet {
     def update: Sheet => Fragment = asFragment compose { case Sheet(id, _, values) =>
       s"""
          |update $pgTable
-         |set ${fields.values} = ${Json.toJson(values).toString().fixForSql}
+         |set ${fields.values} = '${Json.toJson(values).toString().fixForSql}'
          |where ${fields.id} = '$id'
          |""".stripMargin
     }
 
-    def delete: Sheet => Fragment = { case Sheet(id, _, _) =>
-      sql"delete from " ++ Fragment.const(pgTable) ++
-        sql" where " ++ Fragment.const(fields.id) ++ sql" = $id"
+    def delete: Sheet => Fragment = asFragment compose { case Sheet(id, _, _) =>
+      s"""
+         |delete from $pgTable
+         |where ${fields.id} = '$id'
+         |""".stripMargin
     }
   }
 

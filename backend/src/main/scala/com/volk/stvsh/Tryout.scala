@@ -33,11 +33,11 @@ object Tryout extends App {
     } yield sheets
 
   val p2 = for {
-    gotten <- "7fd6d29f-4a20-4b67-9b7a-5f6cee8b136c".getFolder.perform
+    gotten <- "ce5d393f-669b-47fa-8172-2628a71d6360".getFolder.perform
     users <- gotten.map(_.getUsers).map(_.perform).getOrElse(IO.pure(Nil))
   } yield users
 
-  val p3 = "cfb5422f-8143-4337-a00b-d12565fc027e".getSheet.perform
+  val p3 = "0eed7b1d-63a9-47c8-8198-416c49a675ab".getSheet.perform
 
 
 
@@ -46,7 +46,7 @@ object Tryout extends App {
 //  println(folder)
 //  println(allowed)
 
-  println(p1.unsafeRunSync())
+  println(p3.unsafeRunSync())
 //  println(p3.unsafeRunSync())
 
 
