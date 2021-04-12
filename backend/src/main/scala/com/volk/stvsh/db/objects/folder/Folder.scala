@@ -27,17 +27,18 @@ object Folder {
   private val pgTable = "folder"
 
   private object fields {
-    val id = "id"
-    val name = "name"
+    val id      = "id"
+    val name    = "name"
     val ownerId = "owner_id"
-    val schema = "schema"
+    val schema  = "schema"
   }
 
   def apply(name: String, owner: User, schema: FolderSchema): Folder =
     Folder(UUID.randomUUID().toString, name, owner.id, schema)
 
-  private def toFolder: ((ID, String, ID, String)) => Folder = { case (id, name, userId, schemaJson) =>
-    Folder(id, name, userId, Json.parse(schemaJson).as[FolderSchema])
+  private def toFolder: ((ID, String, ID, String)) => Folder = {
+    case (id, name, userId, schemaJson) =>
+      Folder(id, name, userId, Json.parse(schemaJson).as[FolderSchema])
   }
 
   def get: ID => ConnectionIO[Option[Folder]] =
@@ -47,9 +48,14 @@ object Folder {
       .option
       .map(_.map(toFolder))
 
-  def save: Folder => ConnectionIO[Int] = { case f @ Folder(id, _, _, _) =>
-    get(id)
-      .flatMap(_.fold(CRUD.insert(f))(_ => CRUD.update(f)).update.run)
+  def save: Folder => ConnectionIO[Int] = {
+    case f @ Folder(id, _, _, _) =>
+      get(id)
+        .flatMap(
+          _.fold(CRUD.insert(f))(
+            _ => CRUD.update(f)
+          ).update.run
+        )
   }
 
   def delete: Folder => ConnectionIO[Int] = CRUD.delete(_).update.run
@@ -71,78 +77,91 @@ object Folder {
     sql
       .query[(ID, String, ID, String)]
       .to[List]
-      .map(_.map { case (id, name, userId, schemaJson) =>
-        Folder(id, name, userId, Json.parse(schemaJson).as[FolderSchema])
-      })
+      .map(_.map(toFolder))
   }
 
   def allowAccess(
       user: User,
       allow: Boolean = true,
       accessTypes: List[AccessType] = Nil,
-  ): Folder => ConnectionIO[Int] = { case Folder(id, _, _, _) =>
-    val insert = Access.CRUD.insert(id, user.id)
+  ): Folder => ConnectionIO[Int] = {
+    case Folder(id, _, _, _) =>
+      val insert = Access.CRUD.insert(id, user.id)
 
-    Access
-      .getFor(id, user.id)
-      .flatMap {
-        case Nil if allow =>
-          accessTypes
-            .map(insert)
-            .combine
-            .update
-            .run
-        case list =>
-          val (o, n) = accessTypes.partition(list.contains)
-          val sql =
-            if (allow) n.map(insert).combine
-            else Access.CRUD.delete(id, user.id, o)
+      Access
+        .getFor(id, user.id)
+        .flatMap {
+          case Nil if allow =>
+            accessTypes
+              .map(insert)
+              .combine
+              .update
+              .run
+          case list =>
+            val (o, n) = accessTypes.partition(list.contains)
+            val sql =
+              if (allow) n.map(insert).combine
+              else Access.CRUD.delete(id, user.id, o)
 
-          sql.update.run
-      }
+            sql.update.run
+        }
   }
 
-  def getUsers: Folder => ConnectionIO[List[(User, List[AccessType])]] = { case Folder(id, _, ownerId, _) =>
-    val owner: Free[ConnectionOp, Option[(User, List[AccessType])]] =
-      User
-        .get(ownerId)
-        .map(_.map(_ -> (Access.AccessType.full :: Nil)))
+  def getUsers: Folder => ConnectionIO[List[(User, List[AccessType])]] = {
+    case Folder(id, _, ownerId, _) =>
+      val owner: Free[ConnectionOp, Option[(User, List[AccessType])]] =
+        User
+          .get(ownerId)
+          .map(_.map(_ -> (Access.AccessType.full :: Nil)))
 
-    val users = Access.getUsers(id)
+      val users = Access.getUsers(id)
 
-    owner.flatMap(o => users.map(x => o.toList ++ x))
+      owner.flatMap(
+        o =>
+          users.map(
+            x => o.toList ++ x
+          )
+      )
   }
 
   private object CRUD {
-    def select: ID => Fragment = asFragment compose { id =>
-      s"""
-         |select ${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema} from $pgTable
-         |where ${fields.id} = '$id'
-         |""".stripMargin
+    def select: ID => Fragment = asFragment compose {
+      id =>
+        s"""
+           |select ${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema} from $pgTable
+           |where ${fields.id} = '$id'
+           |""".stripMargin
     }
 
-    def update: Folder => Fragment = asFragment compose { case Folder(id, name, ownerId, schema) =>
-      s"""
-         |update $pgTable
-         |set ${fields.name} = '$name', ${fields.ownerId} = '$ownerId', ${fields.schema} = '${Json.toJson(schema).toString().fixForSql}'
-         |where ${fields.id} = '$id'
-         |""".stripMargin
+    def update: Folder => Fragment = asFragment compose {
+      case Folder(id, name, ownerId, schema) =>
+        s"""
+           |update $pgTable
+           |set ${fields.name} = '$name', ${fields.ownerId} = '$ownerId', ${fields.schema} = '${Json.toJson(schema).toString().fixForSql}'
+           |where ${fields.id} = '$id'
+           |""".stripMargin
     }
 
-    def insert: Folder => Fragment = asFragment compose { case Folder(id, name, ownerId, schema) =>
-      s"""
-         |insert into $pgTable
-         |(${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema})
-         |values('$id', '${name.fixForSql}', '$ownerId', '${Json.toJson(schema).toString().fixForSql}')
-         |""".stripMargin
+    def insert: Folder => Fragment = asFragment compose {
+      case Folder(id, name, ownerId, schema) =>
+        s"""
+           |insert into $pgTable
+           |(${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema})
+           |values('$id', '${name.fixForSql}', '$ownerId', '${Json.toJson(schema).toString().fixForSql}')
+           |""".stripMargin
     }
 
-    def delete: Folder => Fragment = asFragment compose { case Folder(id, _, _, _) =>
-      s"""
-         |delete from $pgTable
-         |where ${fields.id} = '$id'
-         |""".stripMargin
+    def delete: Folder => Fragment = asFragment compose {
+      case Folder(id, _, _, _) =>
+        s"""
+           |delete from $pgTable
+           |where ${fields.id} = '$id'
+           |""".stripMargin
     }
+  }
+
+  implicit class FolderJson(folder: Folder) {
+    def toJson: String = Json.toJson(folder).toString()
   }
 
   implicit val folderJson: Format[Folder] = Json.format
@@ -152,16 +171,16 @@ object Access {
   private[db] val pgTable = "folder_access"
 
   private[db] object fields {
-    val folderId = "folder_id"
-    val userId = "user_id"
+    val folderId   = "folder_id"
+    val userId     = "user_id"
     val accessType = "access_type"
   }
 
   object AccessType {
     type AccessType = String
 
-    val full = "FULL"
-    val read = "READ"
+    val full  = "FULL"
+    val read  = "READ"
     val write = "WRITE"
   }
 
@@ -207,9 +226,13 @@ object Access {
       .to[List]
       .flatMap(
         _.groupMap(_._1)(_._2)
-          .map { case (id, accessTypes) => User.get(id).map(_ -> accessTypes) }
+          .map {
+            case (id, accessTypes) => User.get(id).map(_ -> accessTypes)
+          }
           .sequence
-          .map(_.flatMap { case (ost, atps) => ost.map(_ -> atps) })
+          .map(_.flatMap {
+            case (ost, atps) => ost.map(_ -> atps)
+          })
       )
   }
 

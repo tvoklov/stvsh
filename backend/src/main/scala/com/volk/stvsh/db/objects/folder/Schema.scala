@@ -9,11 +9,11 @@ object Schema {
   type ValueType = String
 
   object ValueType {
-    val text        = "text"
-    val wholeNumber = "wholeNumber"
+    val text                = "text"
+    val wholeNumber         = "wholeNumber"
     val floatingPointNumber = "floatingPointNumber"
-    val image       = "image"
-    val tags   = "tags"
+    val image               = "image"
+    val tags                = "tags"
   }
 
 }

@@ -6,7 +6,7 @@ object SqlUtils {
     def fixForSql: String =
       inSqlString.flatMap {
         case '\'' => "''"
-        case x => x + ""
+        case x    => x + ""
       }
   }
 

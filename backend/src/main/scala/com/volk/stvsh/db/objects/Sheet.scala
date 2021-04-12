@@ -23,21 +23,23 @@ object Sheet {
   private[db] val pgTable = "sheet"
 
   private object fields {
-    val id = "id"
-    val values = "value"
+    val id       = "id"
+    val values   = "value"
     val folderId = "folder_id"
   }
 
   def apply(folder: Folder, values: Map[Key, SheetField]): Sheet =
     Sheet(UUID.randomUUID().toString, folder.id, values)
 
-  private def toSheet: ((ID, String, ID)) => Sheet = { case (id, valuesJson, folderId) =>
-    Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
+  private def toSheet: ((ID, String, ID)) => Sheet = {
+    case (id, valuesJson, folderId) =>
+      Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
   }
 
   def validate(folder: Folder): Sheet => Boolean =
-    _.values.forall { case (key, v) =>
-      folder.schema.get(key).contains(v.valueType)
+    _.values.forall {
+      case (key, v) =>
+        folder.schema.get(key).contains(v.valueType)
     }
 
   def get: ID => ConnectionIO[Option[Sheet]] =
@@ -55,7 +57,11 @@ object Sheet {
     check
       .query[String]
       .option
-      .flatMap(_.fold(CRUD.insert(sheet))(_ => CRUD.update(sheet)).update.run)
+      .flatMap(
+        _.fold(CRUD.insert(sheet))(
+          _ => CRUD.update(sheet)
+        ).update.run
+      )
   }
 
   def delete: Sheet => ConnectionIO[Int] = CRUD.delete(_).update.run
@@ -87,35 +93,43 @@ object Sheet {
   }
 
   private object CRUD {
-    def select: ID => Fragment = asFragment compose { id =>
-      s"""
-         |select ${fields.id}, ${fields.values}, ${fields.folderId} from $pgTable
-         |where ${fields.id} = '$id'
-         |""".stripMargin
+    def select: ID => Fragment = asFragment compose {
+      id =>
+        s"""
+           |select ${fields.id}, ${fields.values}, ${fields.folderId} from $pgTable
+           |where ${fields.id} = '$id'
+           |""".stripMargin
     }
 
-    def insert: Sheet => Fragment = asFragment compose { case Sheet(id, folderId, values) =>
-      s"""
-         |insert into $pgTable
-         |(${fields.id}, ${fields.folderId}, ${fields.values})
-         |values('$id', '$folderId', '${Json.toJson(values).toString().fixForSql}')
-         |""".stripMargin
+    def insert: Sheet => Fragment = asFragment compose {
+      case Sheet(id, folderId, values) =>
+        s"""
+           |insert into $pgTable
+           |(${fields.id}, ${fields.folderId}, ${fields.values})
+           |values('$id', '$folderId', '${Json.toJson(values).toString().fixForSql}')
+           |""".stripMargin
     }
 
-    def update: Sheet => Fragment = asFragment compose { case Sheet(id, _, values) =>
-      s"""
-         |update $pgTable
-         |set ${fields.values} = '${Json.toJson(values).toString().fixForSql}'
-         |where ${fields.id} = '$id'
-         |""".stripMargin
+    def update: Sheet => Fragment = asFragment compose {
+      case Sheet(id, _, values) =>
+        s"""
+           |update $pgTable
+           |set ${fields.values} = '${Json.toJson(values).toString().fixForSql}'
+           |where ${fields.id} = '$id'
+           |""".stripMargin
     }
 
-    def delete: Sheet => Fragment = asFragment compose { case Sheet(id, _, _) =>
-      s"""
-         |delete from $pgTable
-         |where ${fields.id} = '$id'
-         |""".stripMargin
+    def delete: Sheet => Fragment = asFragment compose {
+      case Sheet(id, _, _) =>
+        s"""
+           |delete from $pgTable
+           |where ${fields.id} = '$id'
+           |""".stripMargin
     }
+  }
+
+  implicit class SheetJson(sheet: Sheet) {
+    def toJson: String = Json.toJson(sheet).toString()
   }
 
   implicit val sheetJson: Format[Sheet] = Json.format
@@ -148,14 +162,15 @@ object SheetField {
 
       type_.toOption
         .zip(value.toOption)
-        .map { case (t, v) =>
-          t.as[String] match {
-            case ValueType.text                => Text(v.as[String])
-            case ValueType.wholeNumber         => WholeNumber(v.as[Long])
-            case ValueType.floatingPointNumber => FloatingPointNumber(v.as[Float])
-            case ValueType.image               => Image(v.as[String])
-            case ValueType.tags                => Tags(v.as[List[String]])
-          }
+        .map {
+          case (t, v) =>
+            t.as[String] match {
+              case ValueType.text                => Text(v.as[String])
+              case ValueType.wholeNumber         => WholeNumber(v.as[Long])
+              case ValueType.floatingPointNumber => FloatingPointNumber(v.as[Float])
+              case ValueType.image               => Image(v.as[String])
+              case ValueType.tags                => Tags(v.as[List[String]])
+            }
         }
         .fold[JsResult[SheetField]](JsError("something went wrong"))(JsSuccess[SheetField](_))
     }
