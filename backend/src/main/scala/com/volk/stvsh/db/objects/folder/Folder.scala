@@ -1,5 +1,6 @@
 package com.volk.stvsh.db.objects.folder
 
+import cats.effect.IO
 import cats.free.Free
 import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.db.objects.{ asFragment, User }
@@ -64,17 +65,19 @@ object Folder {
       ownerId: Option[String] = None,
       userId: Option[String] = None,
   ): ConnectionIO[List[Folder]] = {
-    val filters =
+    val ownerUserFilter =
       List(
         ownerId.map(fields.ownerId + " = '" + _ + "'"),
-        userId.map(s"${fields.id} in (select ${Access.fields.folderId} from ${Access.pgTable} where ${Access.fields.userId} = '" + _ + "'")
-      ).flatten.mkString("where ", " and ", "")
+        userId.map(s"${fields.id} in (select ${Access.fields.folderId} from ${Access.pgTable} where ${Access.fields.userId} = '" + _ + "')")
+      ).flatten.mkString("where (", ") or (", ")")
 
     val sql =
-      sql"select ${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema} from " ++ Fragment.const(pgTable) ++ sql" " ++
-        Fragment.const(filters)
+      s"""
+         |select ${fields.id}, ${fields.name}, ${fields.ownerId}, ${fields.schema} from $pgTable
+         |$ownerUserFilter
+         |""".stripMargin
 
-    sql
+    asFragment(sql)
       .query[(ID, String, ID, String)]
       .to[List]
       .map(_.map(toFolder))

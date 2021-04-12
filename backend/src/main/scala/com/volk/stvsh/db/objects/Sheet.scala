@@ -42,6 +42,18 @@ object Sheet {
         folder.schema.get(key).contains(v.valueType)
     }
 
+  def head(folderId: ID): ConnectionIO[Long] = {
+    val sql =
+      s"""
+         |select count (distinct ${fields.id}) from $pgTable
+         |where ${fields.folderId} = '$folderId'
+         |""".stripMargin
+
+    asFragment(sql)
+      .query[Long]
+      .unique
+  }
+
   def get: ID => ConnectionIO[Option[Sheet]] =
     CRUD
       .select(_)
