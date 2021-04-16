@@ -6,7 +6,7 @@ import play.api.routing.sird._
 
 import javax.inject.Inject
 
-class FolderRouter @Inject()(controller: FolderController) extends SimpleRouter {
+class FolderRouter @Inject() (controller: FolderController) extends SimpleRouter {
   override def routes: Routes = {
     case GET(p"/$id") =>
       controller.get(id)

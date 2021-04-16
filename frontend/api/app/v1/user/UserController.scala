@@ -5,9 +5,11 @@ import com.volk.stvsh.db.Aliases.ID
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.User
 import com.volk.stvsh.db.objects.folder.Folder._
-import play.api.libs.json.{Format, Json}
-import play.api.mvc.{AbstractController, Action, AnyContent, ControllerComponents}
+import com.volk.stvsh.extensions.PlayJson._
+import play.api.libs.json.{ Format, Json }
+import play.api.mvc.{ AbstractController, Action, AnyContent, ControllerComponents }
 
+import java.util.UUID
 import javax.inject.Inject
 
 class UserController @Inject() (val cc: ControllerComponents) extends AbstractController(cc) {
@@ -27,25 +29,23 @@ class UserController @Inject() (val cc: ControllerComponents) extends AbstractCo
     io.unsafeToFuture()
   }
 
-  def post: Action[AnyContent] = Action.async { request =>
-    val io = request.body.asJson
-      .map(_.as[PreSaveUser])
-      .fold(IO.pure(BadRequest("incorrect json structure"))) {
-        newUser =>
-          val user = newUser.toUser
-          for { _ <- user.save.perform } yield Ok(user.toJson)
-      }
+  def post: Action[AnyContent] = Action.async {
+    request =>
+      val io = request.body.asJson
+        .map(_.as[PreSaveUser])
+        .fold(IO.pure(BadRequest("bad json value"))) {
+          newUser =>
+            val user = newUser.toUser
+            for { _ <- user.save.perform } yield Ok(user.toJson)
+        }
 
-    io.unsafeToFuture()
+      io.unsafeToFuture()
   }
 
 }
 
-case class PreSaveUser(
-                        id: Option[ID],
-                        username: String,
-                      ) {
-  def toUser: User = User(username)
+case class PreSaveUser(id: Option[ID], username: String) {
+  def toUser: User = User(id.getOrElse(UUID.randomUUID().toString), username)
 }
 
 object PreSaveUser {

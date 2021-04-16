@@ -4,7 +4,7 @@ import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.db.objects.SheetField.{ SheetField, _ }
 import com.volk.stvsh.db.objects.folder.Folder
 import com.volk.stvsh.db.objects.folder.Schema.{ Key, ValueType }
-import com.volk.stvsh.extensions.SqlUtils.SqlFixer
+import com.volk.stvsh.extensions.Sql.SqlFixer
 import play.api.libs.json._
 
 import java.util.UUID
@@ -138,10 +138,6 @@ object Sheet {
            |where ${fields.id} = '$id'
            |""".stripMargin
     }
-  }
-
-  implicit class SheetJson(sheet: Sheet) {
-    def toJson: String = Json.toJson(sheet).toString()
   }
 
   implicit val sheetJson: Format[Sheet] = Json.format

@@ -2,7 +2,7 @@ package com.volk.stvsh.extensions
 
 import doobie.Fragment
 
-object DoobieExtensions {
+object Doobie {
 
   def combine(fragments: Iterable[Fragment]): Fragment =
     fragments.foldLeft(Fragment.empty)(
@@ -10,7 +10,7 @@ object DoobieExtensions {
     )
 
   implicit class FragmentCombiner(fragments: Iterable[Fragment]) {
-    def combine: Fragment = DoobieExtensions.combine(fragments)
+    def combine: Fragment = Doobie.combine(fragments)
   }
 
 }

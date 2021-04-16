@@ -6,8 +6,9 @@ import com.volk.stvsh.db.objects.folder.Folder
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.Sheet
 import com.volk.stvsh.db.objects.folder.Schema.FolderSchema
-import play.api.libs.json.{Format, Json}
-import play.api.mvc.{AbstractController, ControllerComponents, _}
+import com.volk.stvsh.extensions.PlayJson._
+import play.api.libs.json.{ Format, Json }
+import play.api.mvc.{ AbstractController, ControllerComponents, _ }
 import play.api.mvc.Results.EmptyContent
 
 import java.util.UUID
@@ -21,13 +22,13 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
   // todo rewrite to a proper head, after figuring out how
   def head(id: String): Action[AnyContent] = Action.async {
     val io = for {
-      maybeFolder <- id.getFolder.perform
-      res <- maybeFolder.fold(IO.pure(NotFound("no folder with given id")))(
-        _ =>
+      folderExists <- Folder.exists(id).perform
+      res <-
+        if (folderExists)
           Sheet.count(id).perform.map {
             x => Ok(EmptyContent()).withHeaders(CONTENT_LENGTH + "_" -> x.toString)
           }
-      )
+        else IO.pure(NotFound("no folder with given id"))
     } yield res
 
     io.unsafeToFuture()
@@ -38,13 +39,10 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
       for {
         maybeFolder <- id.getFolder.perform
         res <- maybeFolder.fold(IO.pure(NotFound("no folder with given id"))) {
-          f =>
-            f
-              .getSheets(offset, limit)
-              .perform
-              .map(_.map(_.toJson))
-              .map(Json.toJson(_))
-              .map(Ok(_))
+          _.getSheets(offset, limit).perform
+            .map(_.map(_.toJson))
+            .map(Json.toJson(_))
+            .map(Ok(_))
         }
       } yield res
 
@@ -57,7 +55,7 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
         folder <- Folder
           .get(id)
           .perform
-      } yield folder.map(_.toJson).fold(NotFound("no folder with given id found"))(Ok(_))
+      } yield folder.map(_.toJson).fold(NotFound("no folder with given id"))(Ok(_))
 
       io.unsafeToFuture()
   }
@@ -66,7 +64,7 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
     implicit request =>
       val io = request.body.asJson
         .map(_.as[PreSaveFolder])
-        .fold(IO.pure(BadRequest("incorrect json structure"))) {
+        .fold(IO.pure(BadRequest("bad json value"))) {
           newFolder =>
             val folder = newFolder.toFolder
             for { _ <- folder.save.perform } yield Ok(folder.toJson)
@@ -81,11 +79,6 @@ object PreSaveFolder {
   implicit val preSaveFolderJson: Format[PreSaveFolder] = Json.format
 }
 
-case class PreSaveFolder(
-                          id: Option[ID],
-                          name: String,
-                          ownerId: ID,
-                          schema: FolderSchema
-                        ) {
+case class PreSaveFolder(id: Option[ID], name: String, ownerId: ID, schema: FolderSchema) {
   def toFolder: Folder = Folder(id.getOrElse(UUID.randomUUID().toString), name, ownerId, schema)
 }

@@ -6,7 +6,7 @@ import play.api.routing.SimpleRouter
 
 import javax.inject.Inject
 
-class UserRouter @Inject()(controller: UserController) extends SimpleRouter {
+class UserRouter @Inject() (controller: UserController) extends SimpleRouter {
   override def routes: Routes = {
     case GET(p"/$id/folders") =>
       controller.getFolders(id)

@@ -62,6 +62,7 @@ lazy val commons = (project in file("commons"))
         libraries.mouse,
         libraries.kittens,
         libraries.catsCollections,
+        libraries.playJson
       )
   )
 

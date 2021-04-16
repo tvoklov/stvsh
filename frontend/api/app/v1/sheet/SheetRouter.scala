@@ -6,7 +6,7 @@ import play.api.routing.sird._
 
 import javax.inject.Inject
 
-class SheetRouter @Inject()(controller: SheetController) extends SimpleRouter {
+class SheetRouter @Inject() (controller: SheetController) extends SimpleRouter {
   override def routes: Routes = {
     case GET(p"/$id") =>
       controller.get(id)
