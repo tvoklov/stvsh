@@ -38,7 +38,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
               } yield res
             ) {
               fid =>
-                val savedSheet = sheet.toSheet(fid)
+                val savedSheet = sheet.toSheet(id, folderId = fid)
                 savedSheet.save.perform.map(
                   _ => Ok(savedSheet.toJson)
                 )
@@ -51,11 +51,11 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
   def post(folderId: String): Action[AnyContent] = Action.async {
     implicit request =>
       val io = request.body.asJson
-        .map(_.as[PreSaveSheet])
-        .map(_.toSheet(folderId))
+        .flatMap(_.asOpt[PreSaveSheet])
+        .map(_.toSheet(folderId = folderId))
         .fold(IO.pure(BadRequest("bad json value for a sheet"))) {
           sheet =>
-            folderId.getFolder.perform
+            sheet.folderId.getFolder.perform
               .flatMap(_.fold(IO.pure(BadRequest("folder with given id not found"))) {
                 folder =>
                   if (!Sheet.validate(folder)(sheet))
@@ -84,9 +84,9 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
 
 }
 
-case class PreSaveSheet(values: Map[Key, SheetField], folderId: Option[String], id: Option[String]) {
-  def toSheet(folderId: String): Sheet =
-    Sheet(UUID.randomUUID().toString, folderId, values)
+case class PreSaveSheet(id: Option[String], folderId: Option[String], values: Map[Key, SheetField]) {
+  def toSheet(id: String = UUID.randomUUID().toString, folderId: String): Sheet =
+    Sheet(this.id.getOrElse(id), this.folderId.getOrElse(folderId), values)
 
 }
 

@@ -1,10 +1,12 @@
 package v1.user
 
 import cats.effect.IO
+import com.volk.stvsh.db.Aliases.ID
 import com.volk.stvsh.db.DBAccess._
+import com.volk.stvsh.db.objects.User
 import com.volk.stvsh.db.objects.folder.Folder._
-import play.api.libs.json.Json
-import play.api.mvc.{ AbstractController, Action, AnyContent, ControllerComponents }
+import play.api.libs.json.{Format, Json}
+import play.api.mvc.{AbstractController, Action, AnyContent, ControllerComponents}
 
 import javax.inject.Inject
 
@@ -25,4 +27,28 @@ class UserController @Inject() (val cc: ControllerComponents) extends AbstractCo
     io.unsafeToFuture()
   }
 
+  def post: Action[AnyContent] = Action.async { request =>
+    val io = request.body.asJson
+      .map(_.as[PreSaveUser])
+      .fold(IO.pure(BadRequest("incorrect json structure"))) {
+        newUser =>
+          val user = newUser.toUser
+          for { _ <- user.save.perform } yield Ok(user.toJson)
+      }
+
+    io.unsafeToFuture()
+  }
+
+}
+
+case class PreSaveUser(
+                        id: Option[ID],
+                        username: String,
+                      ) {
+  def toUser: User = User(username)
+}
+
+object PreSaveUser {
+
+  implicit val preSaveUserJson: Format[PreSaveUser] = Json.format
 }

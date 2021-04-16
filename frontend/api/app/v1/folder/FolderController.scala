@@ -1,11 +1,13 @@
 package v1.folder
 
 import cats.effect.IO
+import com.volk.stvsh.db.Aliases.ID
 import com.volk.stvsh.db.objects.folder.Folder
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.Sheet
-import play.api.libs.json.Json
-import play.api.mvc.{ AbstractController, ControllerComponents, _ }
+import com.volk.stvsh.db.objects.folder.Schema.FolderSchema
+import play.api.libs.json.{Format, Json}
+import play.api.mvc.{AbstractController, ControllerComponents, _}
 import play.api.mvc.Results.EmptyContent
 
 import java.util.UUID
@@ -14,15 +16,16 @@ import javax.inject.Inject
 class FolderController @Inject() (val cc: ControllerComponents) extends AbstractController(cc) {
 
   // stinky head cause stinky play likes to fill in it's own stinky headers
+  // will return CONTENT_LENGTH with a little underscore because read the above
+  // for now is here only to be a "does this folder even exist?" call
+  // todo rewrite to a proper head, after figuring out how
   def head(id: String): Action[AnyContent] = Action.async {
     val io = for {
       maybeFolder <- id.getFolder.perform
       res <- maybeFolder.fold(IO.pure(NotFound("no folder with given id")))(
         _ =>
-          Sheet.head(id).perform.map {
-            x =>
-              println(x)
-              Ok(EmptyContent()).withHeaders(CONTENT_LENGTH + "_" -> x.toString)
+          Sheet.count(id).perform.map {
+            x => Ok(EmptyContent()).withHeaders(CONTENT_LENGTH + "_" -> x.toString)
           }
       )
     } yield res
@@ -62,18 +65,27 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
   def post: Action[AnyContent] = Action.async {
     implicit request =>
       val io = request.body.asJson
-        .map(_.as[Folder])
+        .map(_.as[PreSaveFolder])
         .fold(IO.pure(BadRequest("incorrect json structure"))) {
           newFolder =>
-            val fWithId =
-              if (Option(newFolder.id).forall(_.trim.isEmpty))
-                newFolder.copy(id = UUID.randomUUID().toString)
-              else newFolder
-
-            for { _ <- fWithId.save.perform } yield Ok(fWithId.toJson)
+            val folder = newFolder.toFolder
+            for { _ <- folder.save.perform } yield Ok(folder.toJson)
         }
 
       io.unsafeToFuture()
   }
 
+}
+
+object PreSaveFolder {
+  implicit val preSaveFolderJson: Format[PreSaveFolder] = Json.format
+}
+
+case class PreSaveFolder(
+                          id: Option[ID],
+                          name: String,
+                          ownerId: ID,
+                          schema: FolderSchema
+                        ) {
+  def toFolder: Folder = Folder(id.getOrElse(UUID.randomUUID().toString), name, ownerId, schema)
 }

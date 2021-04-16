@@ -42,7 +42,7 @@ object Sheet {
         folder.schema.get(key).contains(v.valueType)
     }
 
-  def head(folderId: ID): ConnectionIO[Long] = {
+  def count(folderId: ID): ConnectionIO[Long] = {
     val sql =
       s"""
          |select count (distinct ${fields.id}) from $pgTable
