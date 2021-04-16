@@ -1,6 +1,8 @@
 package com.volk.stvsh.extensions
 
-object SqlUtils {
+import doobie.util.fragment.Fragment
+
+object Sql {
 
   implicit class SqlFixer(inSqlString: String) {
     def fixForSql: String =
@@ -8,6 +10,10 @@ object SqlUtils {
         case '\'' => "''"
         case x    => x + ""
       }
+  }
+
+  implicit class ToSqlFragment(sqlString: String) {
+    def toFragment: Fragment = Fragment.const(sqlString)
   }
 
 }

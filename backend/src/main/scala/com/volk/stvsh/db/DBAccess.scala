@@ -2,10 +2,10 @@ package com.volk.stvsh.db
 
 import cats.effect._
 import com.volk.stvsh.BackendConfig.config
-import com.volk.stvsh.db.objects.folder.Access.AccessType.AccessType
+import com.volk.stvsh.db.objects.folder.FolderAccess.AccessType.AccessType
 import com.volk.stvsh.db.Aliases._
-import com.volk.stvsh.db.objects.folder.Folder
-import com.volk.stvsh.db.objects.{ Sheet, User }
+import com.volk.stvsh.db.objects._
+import com.volk.stvsh.db.objects.folder._
 import doobie._
 import doobie.implicits._
 import doobie.util.transactor.Transactor.Aux
@@ -37,13 +37,13 @@ object DBAccess {
 
   implicit class FolderDbAccess(folder: Folder) {
     def save: ConnectionIO[Int]                                = Folder.save(folder)
-    def delete: ConnectionIO[Int]                              = Folder.delete(folder)
+    def delete: ConnectionIO[Int]                              = Folder.delete(folder.id)
     def getOwner: ConnectionIO[Option[User]]                   = User.get(folder.ownerId)
-    def getUsers: ConnectionIO[List[(User, List[AccessType])]] = Folder.getUsers(folder)
+    def getUsers: ConnectionIO[List[(User, List[AccessType])]] = Folder.getAllUsersWithAccess(folder)
     def getSheets(offset: Option[Long] = None, limit: Option[Long] = None): ConnectionIO[List[Sheet]] =
       Sheet.findBy(Some(folder.id), offset, limit)
     def allow(user: User, accessTypes: List[AccessType]): ConnectionIO[Int] =
-      Folder.allowAccess(user, accessTypes = accessTypes)(folder)
+      FolderAccess.allowAccess(user.id, accessTypes = accessTypes)(folder)
   }
 
   implicit class SheetDbAccess(sheet: Sheet) {

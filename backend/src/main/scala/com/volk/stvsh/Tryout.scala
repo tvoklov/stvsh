@@ -2,7 +2,7 @@ package com.volk.stvsh
 
 import cats.effect.IO
 import com.volk.stvsh.db.objects.User
-import com.volk.stvsh.db.objects.folder.Access.AccessType
+import com.volk.stvsh.db.objects.folder.FolderAccess.AccessType
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.SheetField.{ Image, Text }
 import com.volk.stvsh.db.objects.Sheet

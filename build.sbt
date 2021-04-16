@@ -62,6 +62,7 @@ lazy val commons = (project in file("commons"))
         libraries.mouse,
         libraries.kittens,
         libraries.catsCollections,
+        libraries.playJson
       )
   )
 
@@ -79,9 +80,7 @@ lazy val backend = (project in file("backend"))
 lazy val api = (project in file("frontend/api"))
   .settings(commonSettings)
   .settings(
-    libraryDependencies ++= Seq(
-      libraries.play
-    )
+    libraryDependencies += guice
   )
   .enablePlugins(PlayScala)
   .dependsOn(backend)

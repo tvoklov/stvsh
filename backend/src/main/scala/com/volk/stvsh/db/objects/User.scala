@@ -1,7 +1,7 @@
 package com.volk.stvsh.db.objects
 
 import com.volk.stvsh.db.Aliases._
-import com.volk.stvsh.extensions.SqlUtils.SqlFixer
+import com.volk.stvsh.extensions.Sql.SqlFixer
 import play.api.libs.json.{ Format, Json }
 
 case class User(
@@ -99,10 +99,6 @@ object User {
            |where id = '$id'
            |""".stripMargin
     }
-  }
-
-  implicit class UserJson(user: User) {
-    def toJson: String = Json.toJson(user).toString()
   }
 
   implicit val userJson: Format[User] = Json.format
