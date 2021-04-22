@@ -12,9 +12,9 @@ class SheetRouter @Inject() (controller: SheetController) extends SimpleRouter {
       controller.get(id)
 
     case POST(p"/" ? q"folderId=$folderId") =>
-      controller.post(folderId)
+      controller.create(folderId)
 
     case PUT(p"/$id") =>
-      controller.put(id)
+      controller.update(id)
   }
 }
