@@ -1,80 +1,61 @@
 package v1.sheet
 
-import cats.effect.IO
+import cats.implicits._
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.Sheet
 import com.volk.stvsh.db.objects.SheetField.SheetField
 import com.volk.stvsh.db.objects.folder.Schema.Key
 import com.volk.stvsh.extensions.PlayJson._
-import play.api.libs.json.{ Format, Json }
+import doobie.ConnectionIO
+import doobie.implicits._
+import play.api.libs.json.{Format, Json}
 import play.api.mvc._
 
 import java.util.UUID
 import javax.inject.Inject
+import scala.concurrent.Future
 
 class SheetController @Inject() (val cc: ControllerComponents) extends AbstractController(cc) {
 
   def get(id: String): Action[AnyContent] = Action.async {
-    id.getSheet.perform
+    id.getSheet
       .map {
-        case None        => BadRequest("no sheet with given id")
+        case None        => NotFound("No sheet with given id")
         case Some(value) => Ok(value.toJson)
       }
+      .perform
       .unsafeToFuture()
   }
 
   def update(id: String): Action[AnyContent] = Action.async {
     request =>
       val io = request.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
-        case None => IO.pure(BadRequest("bad json value for a sheet"))
-        case Some(sheet) =>
-          for {
-            sheet <- sheet.folderId match {
-              case Some(fId) => IO.pure(Right(sheet.toSheet(id = id, fId)))
-              case None =>
-                for {
-                  maybeSheet <- sheet.id.getOrElse(id).getSheet.perform
-                  res <- maybeSheet match {
-                    case None        => IO.pure(Left("no sheet for given id found"))
-                    case Some(value) => IO.pure(Right(value.copy(values = sheet.values)))
-                  }
-                } yield res
-            }
-            x <- sheet match {
-              case Left(value)  => IO.pure(Left(value))
-              case Right(value) => saveSheetIO(value)
-            }
-          } yield lrToResult[Sheet](_.toJson)(x)
+        case None        => BadRequest("Bad json").pure[ConnectionIO]
+        case Some(sheet) => Sheet.updateValues(id)(sheet.values).map(lrToResult(_.toJson))
       }
 
-      io.unsafeToFuture()
+      io.perform.unsafeToFuture()
   }
 
   def create(folderId: String): Action[AnyContent] = Action.async {
     request =>
       val io = request.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
-        case None        => IO.pure(BadRequest("bad json value for a sheet"))
-        case Some(sheet) => saveSheetIO(sheet.toSheet(folderId = folderId)).map(lrToResult(_.toJson))
+        case None        => BadRequest("bad json value for a sheet").pure[ConnectionIO]
+        case Some(sheet) => Sheet.checkAndSave(sheet.toSheet(folderId = folderId)).map(lrToResult(_.toJson))
       }
 
-      io.unsafeToFuture()
+      io.toResultFuture
   }
 
-  def saveSheetIO(sheet: Sheet): IO[Either[String, Sheet]] =
-    for {
-      folder <- sheet.folderId.getFolder.perform
-      response <-
-        folder match {
-          case None => IO.pure(Left("folder with given id not found"))
-          case Some(folder) =>
-            val sheetConformsToFolder = Sheet.validate(folder)(sheet)
-            if (sheetConformsToFolder)
-              sheet.save.perform.map(
-                _ => Right(sheet)
-              )
-            else IO.pure(Left("sheet violates folder structure"))
-        }
-    } yield response
+  def cioToFuture: ConnectionIO[Result] => Future[Result] =
+    _.perform.attempt
+      .map {
+        case Right(value) => value
+        case Left(value) =>
+          value.printStackTrace()
+          InternalServerError(value.getMessage)
+      }
+      .unsafeToFuture()
 
   def lrToResult[T](func: T => String): Either[String, T] => Result = {
     case Left(value)  => BadRequest(value)
@@ -86,7 +67,6 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
 case class PreSaveSheet(id: Option[String], folderId: Option[String], values: Map[Key, SheetField]) {
   def toSheet(id: String = UUID.randomUUID().toString, folderId: String): Sheet =
     Sheet(this.id.getOrElse(id), this.folderId.getOrElse(folderId), values)
-
 }
 
 object PreSaveSheet {

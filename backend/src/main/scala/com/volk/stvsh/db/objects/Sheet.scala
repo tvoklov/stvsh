@@ -1,5 +1,8 @@
 package com.volk.stvsh.db.objects
 
+import cats.implicits._
+import cats.effect._
+import cats._
 import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.db.objects.SheetField.{ SheetField, _ }
 import com.volk.stvsh.db.objects.folder.Folder
@@ -12,7 +15,7 @@ import java.util.UUID
 case class Sheet(
     id: ID,
     folderId: ID,
-    values: Map[Key, SheetField]
+    values: SheetValues
 )
 
 object Sheet {
@@ -77,6 +80,39 @@ object Sheet {
   }
 
   def delete: Sheet => ConnectionIO[Int] = CRUD.delete(_).update.run
+
+  def checkAndSave: Sheet => ConnectionIO[Either[String, Sheet]] = {
+    case sheet @ Sheet(_, folderId, _) =>
+      for {
+        folder <- Folder.get(folderId)
+        response <-
+          folder match {
+            case None => Left("folder with given id not found").pure[ConnectionIO]
+            case Some(folder) =>
+              if (Sheet.validate(folder)(sheet)) save(sheet).map(_ => Right(sheet))
+              else Left("sheet violates folder structure").pure[ConnectionIO]
+          }
+      } yield response
+  }
+
+  /** updates the values of sheet with given id
+    * @return either the updated sheet OR the error that happened while updating
+    */
+  def updateValues: ID => SheetValues => ConnectionIO[Either[String, Sheet]] = id =>
+    values =>
+      for {
+        ms <- get(id)
+        s <- ms.map(_.copy(values = values)) match {
+          case Some(sheet) =>
+            for {
+              f <- Folder.get(sheet.folderId)
+              s <-
+                if (f.exists(Sheet.validate(_)(sheet))) save(sheet)
+                else Left("values violate sheet structure").pure[ConnectionIO]
+            } yield s
+          case None => Left("no sheet with given id").pure[ConnectionIO]
+        }
+      } yield s
 
   def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long]): ConnectionIO[List[Sheet]] = {
     val filters =
