@@ -82,7 +82,10 @@ lazy val fcommons = (project in file ("frontend/fcommons"))
     name := "fcommons",
     libraryDependencies ++= Seq(
       guice,
-      libraries.play
+      libraries.play,
+      libraries.cats,
+      libraries.catsEffect,
+      libraries.doobieCore,
     )
   )
 

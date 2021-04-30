@@ -5,6 +5,7 @@ import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.Sheet
 import com.volk.stvsh.db.objects.SheetField.SheetField
 import com.volk.stvsh.db.objects.folder.Schema.Key
+import com.volk.stvsh.extensions.Play.PlayIO
 import com.volk.stvsh.extensions.PlayJson._
 import doobie.ConnectionIO
 import doobie.implicits._
@@ -13,7 +14,6 @@ import play.api.mvc._
 
 import java.util.UUID
 import javax.inject.Inject
-import scala.concurrent.Future
 
 class SheetController @Inject() (val cc: ControllerComponents) extends AbstractController(cc) {
 
@@ -24,7 +24,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
         case Some(value) => Ok(value.toJson)
       }
       .perform
-      .unsafeToFuture()
+      .toResultFuture
   }
 
   def update(id: String): Action[AnyContent] = Action.async {
@@ -34,7 +34,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
         case Some(sheet) => Sheet.updateValues(id)(sheet.values).map(lrToResult(_.toJson))
       }
 
-      io.perform.unsafeToFuture()
+      io.perform.toResultFuture
   }
 
   def create(folderId: String): Action[AnyContent] = Action.async {
@@ -44,18 +44,8 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
         case Some(sheet) => Sheet.checkAndSave(sheet.toSheet(folderId = folderId)).map(lrToResult(_.toJson))
       }
 
-      io.toResultFuture
+      io.perform.toResultFuture
   }
-
-  def cioToFuture: ConnectionIO[Result] => Future[Result] =
-    _.perform.attempt
-      .map {
-        case Right(value) => value
-        case Left(value) =>
-          value.printStackTrace()
-          InternalServerError(value.getMessage)
-      }
-      .unsafeToFuture()
 
   def lrToResult[T](func: T => String): Either[String, T] => Result = {
     case Left(value)  => BadRequest(value)

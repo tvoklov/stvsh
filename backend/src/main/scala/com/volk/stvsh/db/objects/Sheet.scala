@@ -104,12 +104,17 @@ object Sheet {
         ms <- get(id)
         s <- ms.map(_.copy(values = values)) match {
           case Some(sheet) =>
-            for {
+            val io = for {
               f <- Folder.get(sheet.folderId)
-              s <-
-                if (f.exists(Sheet.validate(_)(sheet))) save(sheet)
-                else Left("values violate sheet structure").pure[ConnectionIO]
-            } yield s
+              ss <-
+                f.fold(
+                  Left[String, Int]("why is there a sheet with wrong folder id").pure[ConnectionIO]
+                ) {v =>
+                  if (Sheet.validate(v)(sheet)) save(sheet).map(Right(_))
+                  else Left[String, Int]("values violate sheet structure").pure[ConnectionIO]
+                }
+            } yield ss
+            io
           case None => Left("no sheet with given id").pure[ConnectionIO]
         }
       } yield s
