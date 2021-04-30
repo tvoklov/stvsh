@@ -1,8 +1,9 @@
 package com.volk.stvsh.extensions
 
-import cats.effect.{Effect, IO}
-import play.api.mvc.{Action, ActionBuilder, AnyContent, BodyParser, Result}
-import play.api.mvc.Results.InternalServerError
+import cats.effect.{ Effect, IO }
+import play.api.http.Writeable
+import play.api.mvc._
+import play.api.mvc.Results.{ BadRequest, InternalServerError, Ok }
 
 import scala.concurrent.Future
 
@@ -25,7 +26,6 @@ object Play {
   // stolen from https://github.com/larousso/play-cats-io
   // modified a little bit
   implicit class ActionBuilderOps[+R[_], B](ab: ActionBuilder[R, B]) {
-    import cats.implicits._
     import cats.effect.implicits._
 
     def asyncF[F[_]: Effect](cb: R[B] => F[Result]): Action[B] =
@@ -37,4 +37,12 @@ object Play {
     def asyncF[F[_]: Effect, A](bp: BodyParser[A])(cb: R[A] => F[Result]): Action[A] =
       ab.async[A](bp)(cb(_).toIO.unsafeToFuture())
   }
+
+  implicit class EitherResultable[T](either: Either[String, T]) {
+    def toResult[X](func: T => X)(implicit writable: Writeable[X]): Result = either match {
+      case Left(value)  => BadRequest(value)
+      case Right(value) => Ok(func(value))
+    }
+  }
+
 }

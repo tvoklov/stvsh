@@ -89,7 +89,10 @@ object Sheet {
           folder match {
             case None => Left("folder with given id not found").pure[ConnectionIO]
             case Some(folder) =>
-              if (Sheet.validate(folder)(sheet)) save(sheet).map(_ => Right(sheet))
+              if (Sheet.validate(folder)(sheet))
+                save(sheet).map(
+                  _ => Right(sheet)
+                )
               else Left("sheet violates folder structure").pure[ConnectionIO]
           }
       } yield response
@@ -98,26 +101,27 @@ object Sheet {
   /** updates the values of sheet with given id
     * @return either the updated sheet OR the error that happened while updating
     */
-  def updateValues: ID => SheetValues => ConnectionIO[Either[String, Sheet]] = id =>
-    values =>
-      for {
-        ms <- get(id)
-        s <- ms.map(_.copy(values = values)) match {
-          case Some(sheet) =>
-            val io = for {
-              f <- Folder.get(sheet.folderId)
-              ss <-
-                f.fold(
-                  Left[String, Int]("why is there a sheet with wrong folder id").pure[ConnectionIO]
-                ) {v =>
-                  if (Sheet.validate(v)(sheet)) save(sheet).map(Right(_))
-                  else Left[String, Int]("values violate sheet structure").pure[ConnectionIO]
-                }
-            } yield ss
-            io
-          case None => Left("no sheet with given id").pure[ConnectionIO]
-        }
-      } yield s
+  def updateValues: ID => SheetValues => ConnectionIO[Either[String, Sheet]] =
+    id =>
+      values =>
+        for {
+          ms <- get(id)
+          s <- ms.map(_.copy(values = values)) match {
+            case Some(sheet) =>
+              val io: ConnectionIO[Either[String, Sheet]] = for {
+                f <- Folder.get(sheet.folderId)
+                ss <-
+                  f match {
+                    case None => Left("why is there a sheet with wrong folder id").pure[ConnectionIO]
+                    case Some(v) =>
+                      if (Sheet.validate(v)(sheet)) save(sheet).map(_ => Right(sheet))
+                      else Left("values violate sheet structure").pure[ConnectionIO]
+                  }
+              } yield ss
+              io
+            case None => Left("no sheet with given id").pure[ConnectionIO]
+          }
+        } yield s
 
   def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long]): ConnectionIO[List[Sheet]] = {
     val filters =

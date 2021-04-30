@@ -1,11 +1,13 @@
 package v1.user
 
-import cats.effect.IO
+import cats.implicits._
 import com.volk.stvsh.db.Aliases.ID
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.User
 import com.volk.stvsh.db.objects.folder.Folder._
+import com.volk.stvsh.extensions.Play.ActionBuilderOps
 import com.volk.stvsh.extensions.PlayJson._
+import doobie.ConnectionIO
 import play.api.libs.json.{ Format, Json }
 import play.api.mvc.{ AbstractController, Action, AnyContent, ControllerComponents }
 
@@ -14,32 +16,35 @@ import javax.inject.Inject
 
 class UserController @Inject() (val cc: ControllerComponents) extends AbstractController(cc) {
 
-  def getFolders(id: String): Action[AnyContent] = Action.async {
-    val io = for {
-      maybeUser <- id.getUser.perform
-      res <- maybeUser.fold(IO.pure(NotFound("no user found for given id"))) {
-        user =>
-          user.getAccessibleFolders.perform
-            .map(_.map(_.toJson))
-            .map(Json.toJson(_).toString())
-            .map(Ok(_))
+  def get(id: String): Action[AnyContent] = Action.asyncF {
+    id.getUser.map {
+      case None       => NotFound("no user found for given id")
+      case Some(user) => Ok(user.toJson)
+    }.perform
+  }
+
+  def getFolders(id: String): Action[AnyContent] = Action.asyncF {
+    val cio = for {
+      maybeUser <- id.getUser
+      res <- maybeUser match {
+        case None       => NotFound("no user found for given id").pure[ConnectionIO]
+        case Some(user) => user.getAccessibleFolders.map(_.toJson).map(Ok(_))
       }
     } yield res
 
-    io.unsafeToFuture()
+    cio.perform
   }
 
-  def post: Action[AnyContent] = Action.async {
+  def post: Action[AnyContent] = Action.asyncF {
     request =>
-      val io = request.body.asJson
-        .map(_.as[PreSaveUser])
-        .fold(IO.pure(BadRequest("bad json value"))) {
-          newUser =>
-            val user = newUser.toUser
-            for { _ <- user.save.perform } yield Ok(user.toJson)
-        }
+      val io = request.body.asJson.map(_.as[PreSaveUser]) match {
+        case None => BadRequest("bad json value").pure[ConnectionIO]
+        case Some(newUser) =>
+          val user = newUser.toUser
+          for { _ <- user.save } yield Ok(user.toJson)
+      }
 
-      io.unsafeToFuture()
+      io.perform
   }
 
 }
@@ -49,6 +54,5 @@ case class PreSaveUser(id: Option[ID], username: String) {
 }
 
 object PreSaveUser {
-
   implicit val preSaveUserJson: Format[PreSaveUser] = Json.format
 }
