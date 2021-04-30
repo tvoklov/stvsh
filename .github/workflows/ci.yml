@@ -12,10 +12,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Set up JDK 15
+    - name: Set up JDK
       uses: actions/setup-java@v2
       with:
         java-version: '15'
         distribution: 'adopt'
-    - name: Run tests
+    - name: Compile
       run: sbt backend/compile api/compile
