@@ -76,6 +76,19 @@ lazy val backend = (project in file("backend"))
   )
   .dependsOn(commons)
 
+lazy val fcommons = (project in file ("frontend/fcommons"))
+  .settings(commonSettings)
+  .settings(
+    name := "fcommons",
+    libraryDependencies ++= Seq(
+      guice,
+      libraries.play,
+      libraries.cats,
+      libraries.catsEffect,
+      libraries.doobieCore,
+    )
+  )
+
 // frontend implementations: a rest api and a webui
 lazy val api = (project in file("frontend/api"))
   .settings(commonSettings)
@@ -83,9 +96,9 @@ lazy val api = (project in file("frontend/api"))
     libraryDependencies += guice
   )
   .enablePlugins(PlayScala)
-  .dependsOn(backend)
+  .dependsOn(backend, fcommons)
 
-lazy val server = (project in file("frontend/webui"))
+lazy val webui = (project in file("frontend/webui"))
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
@@ -93,4 +106,4 @@ lazy val server = (project in file("frontend/webui"))
     )
   )
   .enablePlugins(PlayScala)
-  .dependsOn(backend)
+  .dependsOn(backend, fcommons)

@@ -8,10 +8,13 @@ import javax.inject.Inject
 
 class UserRouter @Inject() (controller: UserController) extends SimpleRouter {
   override def routes: Routes = {
+    case GET(p"/$id") =>
+      controller.get(id)
+
     case GET(p"/$id/folders") =>
       controller.getFolders(id)
 
-    case POST(p"") =>
+    case POST(p"/") =>
       controller.post
   }
 }
