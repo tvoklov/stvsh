@@ -1,10 +1,12 @@
 package com.volk.stvsh.db.objects.folder
 
+import cats.free.Free
 import com.volk.stvsh.db.objects._
 import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.extensions.Cats._
 import com.volk.stvsh.extensions.Doobie._
 import doobie._
+import doobie.free.connection
 
 object FolderAccess {
   private[db] val pgTable = "folder_access"
@@ -15,24 +17,40 @@ object FolderAccess {
     val accessType = "access_type"
   }
 
+  trait AccessType { def value: String }
   object AccessType {
-    type AccessType = String
-
-    val full  = "FULL"
-    val read  = "READ"
-    val write = "WRITE"
+    def apply(at: String): AccessType = at match {
+      case CanRead.value  => CanRead
+      case CanWrite.value => CanWrite
+      case CanEdit.value  => CanEdit
+    }
   }
 
-  import AccessType._
+  case object CanRead  extends AccessType { val value = "READ"  }
+  case object CanWrite extends AccessType { val value = "WRITE" }
+  case object CanEdit  extends AccessType { val value = "EDIT"  }
 
-  def getAccessGivenTo(folderId: ID, userId: ID): doobie.ConnectionIO[List[AccessType]] = {
+  def accessTypesFor(folderId: ID)(userId: ID): doobie.ConnectionIO[List[AccessType]] =
+    accessTypesForQuery(folderId)(userId).to[List]
+
+  def accessTypesForQuery(folderId: ID)(userId: ID): Query0[AccessType] = asFragment(
+    s"""
+       |select ${fields.accessType} from $pgTable
+       |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId'
+       |""".stripMargin
+  ).query[String].map(AccessType(_))
+
+  def hasAccessType(folderId: ID)(userId: ID)(_type: AccessType): ConnectionIO[Boolean] = {
     val sql =
       s"""
          |select ${fields.accessType} from $pgTable
-         |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId'
+         |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId' and ${fields.accessType} = '${_type.value}'
          |""".stripMargin
 
-    asFragment(sql).query[AccessType].to[List]
+    asFragment(sql)
+      .query[String]
+      .option
+      .map(_.nonEmpty)
   }
 
   /** @return users with any access to the folder other than the owner */
@@ -43,34 +61,32 @@ object FolderAccess {
          |where folder_id = '$folderId'
          |""".stripMargin
 
-    asFragment(sql)
-      .query[(ID, String)]
-      .to[List]
-      .flatMap(
-        _.groupMap(_._1)(_._2)
-         .map {
-           case (id, accessTypes) => User.get(id).map(_ -> accessTypes)
-         }
-         .sequence
-         .map(_.flatMap {
-           case (ost, atps) => ost.map(_ -> atps)
-         })
-        )
+    for {
+      ats <- asFragment(sql).query[(ID, String)].to[List]
+      maybeUsersWithTypes <- ats
+        .groupMap(_._1)(_._2)
+        .map {
+          case (id, accessTypes) => User.get(id).map(_ -> accessTypes)
+        }
+        .sequence
+    } yield maybeUsersWithTypes.collect {
+      case (Some(user), types) => user -> types.map(AccessType(_))
+    }
   }
 
   /** gives/revokes access of given types to the user.
     * will not touch other types of access given to user.
     */
   def allowAccess(
-    userId: ID,
-    allow: Boolean = true,
-    accessTypes: List[AccessType],
+      userId: ID,
+      allow: Boolean = true,
+      accessTypes: List[AccessType],
   ): Folder => ConnectionIO[Int] = {
     case Folder(id, _, _, _) =>
       val insert = CRUD.insert(id, userId)
 
       FolderAccess
-        .getAccessGivenTo(id, userId)
+        .accessTypesFor(id)(userId)
         .flatMap {
           case Nil if allow =>
             accessTypes

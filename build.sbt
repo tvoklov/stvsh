@@ -8,44 +8,46 @@ val commonSettings = Seq(
 val libraries = new {
   val versions = new {
     val pureConfig = "0.14.1"
-    val skunk = "0.0.24"
-    val postgres = "42.2.19"
-    val play = "2.8.7"
-    val playJson = "2.10.0-RC2"
+    val scaffeine  = "4.0.2"
+    val skunk      = "0.0.24"
+    val postgres   = "42.2.19"
+    val play       = "2.8.7"
+    val playJson   = "2.10.0-RC2"
 
     val doobie = new {
-      val core = "0.12.1"
+      val core     = "0.12.1"
       val postgres = core
     }
 
     val cats = new {
-      val core = "2.4.2"
-      val effect = "2.4.0"
-      val mouse = "1.0.0"
-      val kittens = "2.2.1"
+      val core        = "2.4.2"
+      val effect      = "2.4.0"
+      val mouse       = "1.0.0"
+      val kittens     = "2.2.1"
       val collections = "0.9.0"
     }
   }
 
   val pureConfig = "com.github.pureconfig" %% "pureconfig" % versions.pureConfig
+  val scaffeine  = "com.github.blemale"    %% "scaffeine"  % versions.scaffeine
 
-  val skunk = "org.tpolecat" %% "skunk-core" % versions.skunk
-  val doobieCore = "org.tpolecat" %% "doobie-core" % versions.doobie.core
-  val doobiePostgres = "org.tpolecat" %% "doobie-postgres" % versions.doobie.postgres
-  val postgres = "org.postgresql" % "postgresql" % versions.postgres
+  val skunk          = "org.tpolecat"  %% "skunk-core"      % versions.skunk
+  val doobieCore     = "org.tpolecat"  %% "doobie-core"     % versions.doobie.core
+  val doobiePostgres = "org.tpolecat"  %% "doobie-postgres" % versions.doobie.postgres
+  val postgres       = "org.postgresql" % "postgresql"      % versions.postgres
 
   val playJson = "com.typesafe.play" %% "play-json" % versions.playJson
-  val play = "com.typesafe.play" %% "play" % versions.play
+  val play     = "com.typesafe.play" %% "play"      % versions.play
 
-  val cats = "org.typelevel" %% "cats-core" % versions.cats.core
-  val catsFree = "org.typelevel" %% "cats-free" % versions.cats.core
-  val catsEffect = "org.typelevel" %% "cats-effect" % versions.cats.effect
-  val mouse = "org.typelevel" %% "mouse" % versions.cats.mouse
-  val kittens = "org.typelevel" %% "kittens" % versions.cats.kittens
+  val cats            = "org.typelevel" %% "cats-core"             % versions.cats.core
+  val catsFree        = "org.typelevel" %% "cats-free"             % versions.cats.core
+  val catsEffect      = "org.typelevel" %% "cats-effect"           % versions.cats.effect
+  val mouse           = "org.typelevel" %% "mouse"                 % versions.cats.mouse
+  val kittens         = "org.typelevel" %% "kittens"               % versions.cats.kittens
   val catsCollections = "org.typelevel" %% "cats-collections-core" % versions.cats.collections
 
   val configs = pureConfig :: Nil
-  val doobie = doobieCore :: doobiePostgres :: postgres :: Nil
+  val doobie  = doobieCore :: doobiePostgres :: postgres :: Nil
 }
 
 resolvers += Resolver.mavenCentral
@@ -72,11 +74,14 @@ lazy val backend = (project in file("backend"))
   .settings(
     libraryDependencies ++=
       libraries.doobie ++
-        Seq(libraries.playJson)
+        Seq(
+          libraries.playJson,
+          libraries.scaffeine,
+        )
   )
   .dependsOn(commons)
 
-lazy val fcommons = (project in file ("frontend/fcommons"))
+lazy val fcommons = (project in file("frontend/fcommons"))
   .settings(commonSettings)
   .settings(
     name := "fcommons",

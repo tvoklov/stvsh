@@ -1,11 +1,10 @@
 package com.volk.stvsh
 
 import cats.effect.IO
-import com.volk.stvsh.db.objects.User
-import com.volk.stvsh.db.objects.folder.FolderAccess.AccessType
+import com.volk.stvsh.db.objects.folder.FolderAccess.CanRead
 import com.volk.stvsh.db.DBAccess._
+import com.volk.stvsh.db.objects.{ Sheet, User }
 import com.volk.stvsh.db.objects.SheetField.{ Image, Text }
-import com.volk.stvsh.db.objects.Sheet
 import com.volk.stvsh.db.objects.folder.Folder
 import com.volk.stvsh.db.objects.folder.Schema.ValueType
 
@@ -26,7 +25,7 @@ object Tryout extends App {
 
       user2  <- IO.pure(User("less cool user"))
       _      <- user2.save.perform
-      _      <- folder.allow(user2, List(AccessType.read)).perform
+      _      <- folder.allow(user2, List(CanRead)).perform
       sheet  <- IO.pure(Sheet(folder, Map("cool" -> Text("yeah it's cool"), "epic" -> Image("yiff.png"))))
       _      <- sheet.save.perform
       sheets <- folder.getSheets().perform
