@@ -1,12 +1,16 @@
 package com.volk.stvsh.db.objects.folder
 
-import cats.free.Free
+import cats.implicits.catsSyntaxApplicativeId
+import com.github.blemale.scaffeine.{ LoadingCache, Scaffeine }
 import com.volk.stvsh.db.objects._
 import com.volk.stvsh.db.Aliases._
+import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.extensions.Cats._
 import com.volk.stvsh.extensions.Doobie._
 import doobie._
-import doobie.free.connection
+
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.Duration
 
 object FolderAccess {
   private[db] val pgTable = "folder_access"
@@ -17,18 +21,34 @@ object FolderAccess {
     val accessType = "access_type"
   }
 
+  val accessTypeCache: LoadingCache[(String, String), List[AccessType]] = Scaffeine()
+    .expireAfterWrite(Duration(1, TimeUnit.HOURS))
+    .build {
+      case (folderId: String, userId: String) =>
+        val io: ConnectionIO[List[AccessType]] = for {
+          mf <- Folder.get(folderId)
+          types <- mf match {
+            case Some(Folder(_, _, `userId`, _)) => (Owner :: Nil).pure[ConnectionIO]
+            case None        => accessTypesFor(folderId)(userId)
+          }
+        } yield types
+
+        io.perform.unsafeRunSync()
+    }
+
   trait AccessType { def value: String }
   object AccessType {
     def apply(at: String): AccessType = at match {
-      case CanRead.value  => CanRead
-      case CanWrite.value => CanWrite
-      case CanEdit.value  => CanEdit
+      case CanReadSheets.value  => CanReadSheets
+      case CanWriteSheets.value => CanWriteSheets
+      case CanEditFolder.value  => CanEditFolder
     }
   }
 
-  case object CanRead  extends AccessType { val value = "READ"  }
-  case object CanWrite extends AccessType { val value = "WRITE" }
-  case object CanEdit  extends AccessType { val value = "EDIT"  }
+  case object CanReadSheets  extends AccessType { val value = "READ"                                                      }
+  case object CanWriteSheets extends AccessType { val value = "WRITE"                                                     }
+  case object CanEditFolder  extends AccessType { val value = "EDIT"                                                      }
+  case object Owner          extends AccessType { def value = throw new IllegalAccessError("this should never be called") }
 
   def accessTypesFor(folderId: ID)(userId: ID): doobie.ConnectionIO[List[AccessType]] =
     accessTypesForQuery(folderId)(userId).to[List]
@@ -40,17 +60,28 @@ object FolderAccess {
        |""".stripMargin
   ).query[String].map(AccessType(_))
 
-  def hasAccessType(folderId: ID)(userId: ID)(_type: AccessType): ConnectionIO[Boolean] = {
-    val sql =
-      s"""
-         |select ${fields.accessType} from $pgTable
-         |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId' and ${fields.accessType} = '${_type.value}'
-         |""".stripMargin
-
-    asFragment(sql)
-      .query[String]
-      .option
-      .map(_.nonEmpty)
+  def hasAccessType(folderId: ID)(userId: ID)(types: AccessType*): Boolean = {
+    accessTypeCache.get((folderId, userId)) match {
+      case Owner :: Nil => true
+      case xs            => types.exists(xs.contains)
+    }
+    // todo leaving here for now, if commit is old - remove this
+//    val sql =
+//      s"""
+//         |select ${fields.accessType} from $pgTable
+//         |where ${fields.folderId} = '$folderId' and ${fields.userId} = '$userId'
+//         |  and ${fields.accessType} in ${types.map(_.value).mkString("('", "', '", "')")}
+//         |""".stripMargin
+//
+//    Folder.get(folderId).flatMap {
+//      case Some(Folder(_, _, `userId`, _)) =>
+//        true.pure[ConnectionIO]
+//      case _ =>
+//        asFragment(sql)
+//          .query[String]
+//          .option
+//          .map(_.nonEmpty)
+//    }
   }
 
   /** @return users with any access to the folder other than the owner */

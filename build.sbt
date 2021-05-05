@@ -92,7 +92,7 @@ lazy val fcommons = (project in file("frontend/fcommons"))
       libraries.catsEffect,
       libraries.doobieCore,
     )
-  )
+  ).dependsOn(backend)
 
 // frontend implementations: a rest api and a webui
 lazy val api = (project in file("frontend/api"))

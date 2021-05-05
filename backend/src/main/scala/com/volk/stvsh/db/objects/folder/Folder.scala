@@ -44,8 +44,8 @@ object Folder {
     case f @ Folder(id, _, _, _) =>
       exists(id)
         .flatMap(
-          if (_) CRUD.insert(f)
-          else CRUD.update(f)
+          if (_) CRUD.update(f)
+          else CRUD.insert(f)
         )
   }
 
@@ -79,7 +79,7 @@ object Folder {
       val owner: ConnectionIO[Option[(User, List[AccessType])]] =
         User
           .get(ownerId)
-          .map(_.map(_ -> (FolderAccess.CanEdit :: FolderAccess.CanRead :: FolderAccess.CanWrite :: Nil)))
+          .map(_.map(_ -> (FolderAccess.CanEditFolder :: FolderAccess.CanReadSheets :: FolderAccess.CanWriteSheets :: Nil)))
 
       val users = FolderAccess.getUsersWithAccess(id)
 
