@@ -2,7 +2,7 @@ package com.volk.stvsh.db.objects.folder
 
 import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.db.objects._
-import com.volk.stvsh.db.objects.folder.FolderAccess.AccessType.AccessType
+import com.volk.stvsh.db.objects.folder.FolderAccess.AccessType
 import com.volk.stvsh.db.objects.folder.Schema.FolderSchema
 import com.volk.stvsh.extensions.Sql._
 import doobie._
@@ -44,8 +44,8 @@ object Folder {
     case f @ Folder(id, _, _, _) =>
       exists(id)
         .flatMap(
-          if (_) CRUD.insert(f)
-          else CRUD.update(f)
+          if (_) CRUD.update(f)
+          else CRUD.insert(f)
         )
   }
 
@@ -79,7 +79,7 @@ object Folder {
       val owner: ConnectionIO[Option[(User, List[AccessType])]] =
         User
           .get(ownerId)
-          .map(_.map(_ -> (FolderAccess.AccessType.full :: Nil)))
+          .map(_.map(_ -> (FolderAccess.CanEditFolder :: FolderAccess.CanReadSheets :: FolderAccess.CanWriteSheets :: Nil)))
 
       val users = FolderAccess.getUsersWithAccess(id)
 

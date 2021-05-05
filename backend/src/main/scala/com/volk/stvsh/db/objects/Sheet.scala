@@ -5,7 +5,8 @@ import cats.effect._
 import cats._
 import com.volk.stvsh.db.Aliases._
 import com.volk.stvsh.db.objects.SheetField.{ SheetField, _ }
-import com.volk.stvsh.db.objects.folder.Folder
+import com.volk.stvsh.db.objects.folder.{ Folder, FolderAccess }
+import com.volk.stvsh.db.objects.folder.FolderAccess.CanWriteSheets
 import com.volk.stvsh.db.objects.folder.Schema.{ Key, ValueType }
 import com.volk.stvsh.extensions.Sql.SqlFixer
 import play.api.libs.json._
@@ -39,10 +40,9 @@ object Sheet {
       Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
   }
 
-  def validate(folder: Folder): Sheet => Boolean =
-    _.values.forall {
-      case (key, v) =>
-        folder.schema.get(key).contains(v.valueType)
+  def validate(folder: Folder): SheetValues => Boolean =
+    _.forall {
+      case (key, v) => folder.schema.get(key).contains(v.valueType)
     }
 
   def count(folderId: ID): ConnectionIO[Long] = {
@@ -66,10 +66,10 @@ object Sheet {
 
   def save(sheet: Sheet): ConnectionIO[Int] = {
     val check =
-      sql"select ${fields.id} from " ++ Fragment.const(pgTable) ++
-        sql" where " ++ Fragment.const(fields.id) ++ sql" = ${sheet.id}"
+      s"""select ${fields.id} from $pgTable
+          where ${fields.id} = '${sheet.id}'""".stripMargin
 
-    check
+    asFragment(check)
       .query[String]
       .option
       .flatMap(
@@ -85,43 +85,39 @@ object Sheet {
     case sheet @ Sheet(_, folderId, _) =>
       for {
         folder <- Folder.get(folderId)
-        response <-
+        res <-
           folder match {
             case None => Left("folder with given id not found").pure[ConnectionIO]
             case Some(folder) =>
-              if (Sheet.validate(folder)(sheet))
+              if (Sheet.validate(folder)(sheet.values))
                 save(sheet).map(
                   _ => Right(sheet)
                 )
               else Left("sheet violates folder structure").pure[ConnectionIO]
           }
-      } yield response
+      } yield res
   }
 
   /** updates the values of sheet with given id
     * @return either the updated sheet OR the error that happened while updating
     */
-  def updateValues: ID => SheetValues => ConnectionIO[Either[String, Sheet]] =
-    id =>
+  def updateValues: Sheet => SheetValues => ConnectionIO[Either[String, Sheet]] =
+    sheet =>
       values =>
         for {
-          ms <- get(id)
-          s <- ms.map(_.copy(values = values)) match {
-            case Some(sheet) =>
-              val io: ConnectionIO[Either[String, Sheet]] = for {
-                f <- Folder.get(sheet.folderId)
-                ss <-
-                  f match {
-                    case None => Left("why is there a sheet with wrong folder id").pure[ConnectionIO]
-                    case Some(v) =>
-                      if (Sheet.validate(v)(sheet)) save(sheet).map(_ => Right(sheet))
-                      else Left("values violate sheet structure").pure[ConnectionIO]
-                  }
-              } yield ss
-              io
-            case None => Left("no sheet with given id").pure[ConnectionIO]
-          }
-        } yield s
+          f <- Folder.get(sheet.folderId)
+          ss <-
+            f match {
+              case None => Left("why is there a sheet with wrong folder id").pure[ConnectionIO]
+              case Some(v) =>
+                if (validate(v)(values)) {
+                  val newSheet = sheet.copy(values = values)
+                  save(newSheet).map(
+                    _ => Right(newSheet)
+                  )
+                } else Left("values violate sheet structure").pure[ConnectionIO]
+            }
+        } yield ss
 
   def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long]): ConnectionIO[List[Sheet]] = {
     val filters =

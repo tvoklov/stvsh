@@ -17,4 +17,9 @@ create table sheet(
 	id varchar(36) primary key,
 	folder_id varchar(36),
 	value varchar
+);
+create table sessions(
+	id varchar(36) primary key,
+	user_id varchar(36),
+	expiry_date timestamp
 )
