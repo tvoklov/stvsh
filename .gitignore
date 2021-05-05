@@ -9,7 +9,7 @@
 /commons/target/
 /frontend/api/target/
 /frontend/webui/target/
+/frontend/fcommons/target/
 
 *.class
 *.log
-/frontend/fcommons/target/
