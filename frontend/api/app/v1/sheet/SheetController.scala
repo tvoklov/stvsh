@@ -4,12 +4,11 @@ import cats.implicits._
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.Sheet
 import com.volk.stvsh.db.objects.SheetField.SheetField
-import com.volk.stvsh.db.objects.folder.FolderAccess
 import com.volk.stvsh.db.objects.folder.FolderAccess.{ CanReadSheets, CanWriteSheets }
 import com.volk.stvsh.db.objects.folder.Schema.Key
 import com.volk.stvsh.extensions.Play.{ ActionBuilderOps, EitherResultable }
 import com.volk.stvsh.extensions.PlayJson._
-import com.volk.stvsh.v1.SessionManagement.withSessionCheck
+import com.volk.stvsh.v1.SessionManagement._
 import doobie.ConnectionIO
 import doobie.implicits._
 import play.api.libs.json.{ Format, Json }
@@ -25,14 +24,13 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
       request =>
         val cio = for {
           maybeSheet <- id.getSheet
-          res <-
-            maybeSheet match {
-              case None => NotFound("").pure[ConnectionIO]
-              case Some(sheet) =>
-                withSessionCheck(us => FolderAccess.hasAccessType(sheet.folderId)(us.userId)(CanReadSheets).pure[ConnectionIO], "no access to folder")(
-                  _ => Ok(sheet.toJson).pure[ConnectionIO]
-                )(request)
-            }
+          res <- maybeSheet match {
+            case None => NotFound("").pure[ConnectionIO]
+            case Some(sheet) =>
+              ifHasFolderAccess(CanReadSheets)(sheet.folderId)(
+                _ => Ok(sheet.toJson).pure[ConnectionIO]
+              )(request)
+          }
         } yield res
 
         cio.perform
@@ -40,20 +38,19 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
 
   def update: String => Action[AnyContent] = id =>
     Action.asyncF {
-      request =>
+      req =>
         val cio = for {
           maybeSheet <- id.getSheet
           res <-
             maybeSheet match {
               case None => NotFound("").pure[ConnectionIO]
               case Some(existingSheet) =>
-                withSessionCheck(us => FolderAccess.hasAccessType(existingSheet.folderId)(us.userId)(CanWriteSheets).pure[ConnectionIO], "no access to folder") {
-                  _ =>
-                    request.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
-                      case None          => BadRequest("Bad json").pure[ConnectionIO]
-                      case Some(preSave) => for { up <- Sheet.updateValues(existingSheet)(preSave.values) } yield up.toResult(_.toJson)
-                    }
-                }(request)
+                ifHasFolderAccess(CanWriteSheets)(existingSheet.folderId)(
+                  _.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
+                    case None          => BadRequest("Bad json").pure[ConnectionIO]
+                    case Some(preSave) => for { up <- Sheet.updateValues(existingSheet)(preSave.values) } yield up.toResult(_.toJson)
+                  }
+                )(req)
             }
         } yield res
 
@@ -62,16 +59,12 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
 
   def create: String => Action[AnyContent] = folderId =>
     Action.asyncF {
-      request =>
-        withSessionCheck(
-          us => FolderAccess.hasAccessType(folderId)(us.userId)(CanWriteSheets).pure[ConnectionIO]
-        ) {
-          _ =>
-            request.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
-              case None        => BadRequest("bad json value for a sheet").pure[ConnectionIO]
-              case Some(sheet) => Sheet.checkAndSave(sheet.toSheet(folderId = folderId)).map(_.toResult(_.toJson))
-            }
-        }(request).perform
+      ifHasFolderAccess(CanWriteSheets)(folderId)(
+        _.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
+          case None        => BadRequest("bad json value for a sheet").pure[ConnectionIO]
+          case Some(sheet) => Sheet.checkAndSave(sheet.toSheet(folderId = folderId)).map(_.toResult(_.toJson))
+        }
+      ) andThen (_.perform)
     }
 
 }
