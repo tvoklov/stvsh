@@ -29,7 +29,7 @@ object FolderAccess {
           mf <- Folder.get(folderId)
           types <- mf match {
             case Some(Folder(_, _, `userId`, _)) => (Owner :: Nil).pure[ConnectionIO]
-            case None        => accessTypesFor(folderId)(userId)
+            case _                               => accessTypesFor(folderId)(userId)
           }
         } yield types
 
@@ -60,12 +60,12 @@ object FolderAccess {
        |""".stripMargin
   ).query[String].map(AccessType(_))
 
-  def hasAccessType(folderId: ID)(userId: ID)(types: AccessType*): Boolean = {
+  def hasAccessType(folderId: ID)(userId: ID)(types: AccessType*): Boolean =
     accessTypeCache.get((folderId, userId)) match {
       case Owner :: Nil => true
-      case xs            => types.exists(xs.contains)
+      case xs           => types.exists(xs.contains)
     }
-    // todo leaving here for now, if commit is old - remove this
+  // todo leaving here for now, if commit is old - remove this
 //    val sql =
 //      s"""
 //         |select ${fields.accessType} from $pgTable
@@ -82,7 +82,6 @@ object FolderAccess {
 //          .option
 //          .map(_.nonEmpty)
 //    }
-  }
 
   /** @return users with any access to the folder other than the owner */
   def getUsersWithAccess(folderId: ID): ConnectionIO[List[(User, List[AccessType])]] = {
