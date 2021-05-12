@@ -1,0 +1,3 @@
+-> /v1 v1.Routes
+
+GET     /*file                      controllers.FrontendController.assetOrDefault(file)
