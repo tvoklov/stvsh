@@ -1,0 +1,20 @@
+{
+  "dependencies": {
+    "react": "16.8.x",
+    "react-dom": "16.8.x",
+    "react-router-dom": "5.0.x"
+  },
+  "devDependencies": {
+    "@babel/core": "7.4.x",
+    "@babel/preset-env": "7.4.x",
+    "@babel/preset-react": "7.0.x",
+    "babel-loader": "8.0.x",
+    "webpack": "4.34.x",
+    "webpack-cli": "3.3.x"
+  },
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "dev": "webpack --config webpack.config.js --watch --mode=development",
+    "prod": "webpack --config webpack.config.js --mode=production"
+  }
+}
