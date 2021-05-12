@@ -1,9 +1,9 @@
 package com.volk.stvsh.extensions
 
-import cats.effect.{ Effect, IO }
+import cats.effect._
 import play.api.http.Writeable
+import play.api.mvc.Results.{BadRequest, InternalServerError, Ok}
 import play.api.mvc._
-import play.api.mvc.Results.{ BadRequest, InternalServerError, Ok }
 
 import scala.concurrent.Future
 

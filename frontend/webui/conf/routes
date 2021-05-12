@@ -1,1 +1,4 @@
-GET      /                    folder.FolderController
+-> /v1 v1.Routes
+
+GET     /index                      controllers.Assets.at(path="/public/html", file="e.html")
+GET     /*file                      controllers.Assets.at(path="/public", file)

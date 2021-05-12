@@ -107,8 +107,9 @@ lazy val webui = (project in file("frontend/webui"))
   .settings(commonSettings)
   .settings(
     libraryDependencies ++= Seq(
-      libraries.play
+      guice
     )
   )
   .enablePlugins(PlayScala)
-  .dependsOn(backend, fcommons)
+  .aggregate(api)
+  .dependsOn(backend, fcommons, api)
