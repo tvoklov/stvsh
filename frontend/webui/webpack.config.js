@@ -2,8 +2,7 @@ const path = require('path');
 
 module.exports = {
   entry: {
-    main: './ui/main.js',
-    maincp: './ui/main copy.js'
+    index: './ui/index.js'
   },
   output: {
     path: path.resolve(__dirname, 'public/js'),

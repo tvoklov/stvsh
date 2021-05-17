@@ -48,7 +48,7 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
 
   def getSheets(id: String)(offset: Option[Long], limit: Option[Long], sortBy: Option[String]): Action[AnyContent] =
     Action.asyncF {
-      ifHasFolderAccess(CanWriteSheets)(id)(
+      ifHasFolderAccess(CanReadSheets)(id)(
         _ =>
           for {
             maybeFolder <- id.getFolder

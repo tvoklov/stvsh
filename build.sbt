@@ -108,7 +108,8 @@ lazy val webui = (project in file("frontend/webui"))
   .settings(
     libraryDependencies ++= Seq(
       guice
-    )
+    ),
+	watchSources += file("frontend/webui/ui/")
   )
   .enablePlugins(PlayScala)
   .aggregate(api)
