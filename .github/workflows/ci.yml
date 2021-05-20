@@ -34,6 +34,6 @@ jobs:
         npm install
     
     - name: Webpack
-      working-directory: ./frontend/webui
-      run:
+    - working-directory: ./frontend/webui
+    - run:
         npm run build
