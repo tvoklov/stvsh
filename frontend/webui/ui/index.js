@@ -3,7 +3,7 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 
 import {fetchFromApi} from './fetching'
-import {sheetTable, FoldersTable} from './folderview'
+import { SheetTable, FoldersTable } from './folderview'
 import { Sheet } from './sheet'
 
 const session = Cookies.get('session')
@@ -35,12 +35,8 @@ function showFolder(id) {
                 fetchFromApi('/folder/' + id + '/sheets')
                     .then(res => res.json().then( sheets => {
                         ReactDOM.render(
-                            sheetTable(
-                                f,
-                                sheets,
-                                sheet => showSheet(sheet.id)
-                            ),
-                            document.getElementById('folder')
+                            <SheetTable key={f.id} folder={f} sheets={sheets} onClick={ sheet => showSheet(sheet.id) } />,
+                            document.getElementById('sheets')
                         );
                     }))
             }))
@@ -55,7 +51,7 @@ function showSheet(id) {
         .then(res => res.json().then(
             s => {
                 ReactDOM.render(
-                    <Sheet sheet={s} />,
+                    <Sheet key={s.id} sheet={s} />,
                     document.getElementById('sheet')
                 );
             }
