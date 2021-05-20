@@ -27,13 +27,13 @@ jobs:
     
     steps:
     - name: Setup
-    - working-directory: ./frontend/webui
+      working-directory: ./frontend/webui
     - uses: actions/checkout@v2
     - uses: actions/setup-node@v1
     - run:
         npm install
     
     - name: Webpack
-    - working-directory: ./frontend/webui
+      working-directory: ./frontend/webui
     - run:
         npm run build
