@@ -18,7 +18,7 @@ jobs:
         java-version: adopt@1.14
     
     - name: Compile
-    - run:
+      run:
         sbt backend/compile api/compile webui/compile
   
   compile_js:
@@ -35,5 +35,5 @@ jobs:
     
     - name: Webpack
       working-directory: ./frontend/webui
-    - run:
+      run:
         npm run build
