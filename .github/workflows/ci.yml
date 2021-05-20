@@ -11,22 +11,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: olafurpg/setup-scala@v10
+    - name: Setup
+    - uses:
+        actions/checkout@v2
+        olafurpg/setup-scala@v10
       with:
         java-version: adopt@1.14
+    
     - name: Compile
-      run: sbt backend/compile api/compile webui/compile
+      run:
+        sbt backend/compile api/compile webui/compile
   
   compile_js:
     needs: compile_scala
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
+    - name: Setup
+    - working-directory: ./frontend/webui
+    - uses:
+        actions/checkout@v2
+        actions/setup-node@v1
+    - run:
+        npm install
+    
     - name: Webpack
       working-directory: ./frontend/webui
       run:
-        npm install
         npm run build
