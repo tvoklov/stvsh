@@ -12,9 +12,8 @@ jobs:
 
     steps:
     - name: Setup
-    - uses:
-        actions/checkout@v2
-        olafurpg/setup-scala@v10
+    - uses: actions/checkout@v2
+    - uses: olafurpg/setup-scala@v10
       with:
         java-version: adopt@1.14
     
@@ -29,9 +28,8 @@ jobs:
     steps:
     - name: Setup
     - working-directory: ./frontend/webui
-    - uses:
-        actions/checkout@v2
-        actions/setup-node@v1
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
     - run:
         npm install
     
