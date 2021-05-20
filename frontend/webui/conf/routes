@@ -1,4 +1,4 @@
 -> /v1 v1.Routes
 
-GET     /index                      controllers.Assets.at(path="/public/html", file="e.html")
+GET     /                           controllers.Assets.at(path="/public/html", file="index.html")
 GET     /*file                      controllers.Assets.at(path="/public", file)
