@@ -11,9 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Setup
-    - uses: actions/checkout@v2
-    - uses: olafurpg/setup-scala@v10
+    - name: Checkout
+      uses: actions/checkout@v2
+    
+    - name: Setup scala
+      uses: olafurpg/setup-scala@v10
       with:
         java-version: adopt@1.14
     
@@ -26,11 +28,13 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Setup
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Setup npm
+      uses: actions/setup-node@v1
+    - name: Install npm
       working-directory: ./frontend/webui
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
-    - run:
+      run:
         npm install
     
     - name: Webpack
