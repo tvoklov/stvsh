@@ -27,4 +27,4 @@ jobs:
     - uses: actions/setup-node@v1
     - name: Webpack
       working-directory: ./frontend/webui
-      run: npm build
+      run: npm run build
