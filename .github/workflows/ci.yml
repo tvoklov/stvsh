@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  compile_all:
+  compile_scala:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,4 +19,17 @@ jobs:
         java-version: '15'
         distribution: 'adopt'
     - name: Compile
-      run: sbt backend/compile api/compile
+      run: sbt backend/compile api/compile webui/compile
+  
+  compile_js:
+    needs: compile_scala
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Set up npm
+      uses: actions/setup-node@v1
+    - name: Webpack
+      working-directory: ./frontend/webui
+      run: npm build
