@@ -11,13 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Set up JDK
-      uses: actions/setup-java@v2
+    - uses: actions/checkout@v2
+    - uses: olafurpg/setup-scala@v10
       with:
-        java-version: '15'
-        distribution: 'adopt'
+        java-version: adopt@1.14
     - name: Compile
       run: sbt backend/compile api/compile webui/compile
   
@@ -26,10 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-    - name: Set up npm
-      uses: actions/setup-node@v1
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v1
     - name: Webpack
       working-directory: ./frontend/webui
       run: npm build
