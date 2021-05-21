@@ -1,3 +1,11 @@
 .clickable {
     cursor: pointer;
 }
+
+table, th, td {
+    border: 0.1rem solid black;
+}
+
+table {
+    border-collapse: collapse;
+}

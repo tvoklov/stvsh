@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom'
 
 import {fetchFromApi} from './fetching'
 import { SheetTable, FoldersTable } from './folderview'
-import { Sheet } from './sheet'
+import { PrettySheet } from './sheet'
 
 const session = Cookies.get('session')
 let user = Cookies.get('user')
@@ -51,7 +51,7 @@ function showSheet(id) {
         .then(res => res.json().then(
             s => {
                 ReactDOM.render(
-                    <Sheet key={s.id} sheet={s} />,
+                    <PrettySheet key={s.id} sheet={s} />,
                     document.getElementById('sheet')
                 );
             }
