@@ -24,36 +24,71 @@ export function SheetRow(props) {
 
 }
 
-export function Sheet(props) {
+export function BasicSheet(props) {
     const [sheet, setSheet] = useState(props.sheet)
-    
+    const values = sheet.values
+
     return (
         <table>
             <tbody>
                 {
-                    Object.entries(sheet.values).map(
+                    Object.entries(values).map(
                         ([name, value]) => renderableSheetValue(sheet.id, name, value)
                     )
                 }
             </tbody>
         </table>
     )
+}
 
+export function PrettySheet(props) {
+    const [sheet, setSheet] = useState(props.sheet)
+    const values = sheet.values
+    const entries = Object.entries(values)
+
+    const img = entries.find(([name, value]) => value.type === 'image')
+
+    const imgTag =
+        img ? (
+            <figure>
+                <img src={img[1].value} alt={img[1].value}/>
+                <figcaption>Image in {img[0]}</figcaption>
+            </figure>) : <></>
+
+    const entriesTag =
+        img ?
+            entries.filter(([name, ]) => name !== img[0]).map(
+                ([name, value]) => renderableSheetValue(sheet.id, name, value)
+            ) :
+            entries.map(
+                ([name, value]) => renderableSheetValue(sheet.id, name, value)
+            )
+
+    return (
+        <div>
+            {imgTag}
+            <table>
+                <tbody>
+                    {entriesTag}
+                </tbody>
+            </table>
+        </div>
+    )
 }
 
 function renderableSheetValue(sheetId, name, value) {
     switch (value.type) {
         case 'text':
-            return (<SheetText key={sheetId + name} name={name} value={value} />)
+            return (<TextRow key={name + sheetId} name={name} value={value} />)
         case 'image':
-            return (<SheetImage key={sheetId + name} name={name} value={value} />)
+            return (<ImageRow key={name + sheetId} name={name} value={value} />)
         default:
-            return (<SheetText key={sheetId + name} name={name} value={value} />)
+            return (<TextRow key={name + sheetId} name={name} value={value} />)
     }
 }
 
 
-function SheetText(props) {
+function TextRow(props) {
     const [value, setValue] = useState(props.value)
     const name = props.name
     
@@ -65,7 +100,7 @@ function SheetText(props) {
     )
 }
 
-function SheetImage(props) {
+function ImageRow(props) {
     const [value, setValue] = useState(props.value)
     const name = props.name
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { SheetRow } from './sheet'
 
+/** requires 'sheets' array of sheets, 'folder' and an optional 'onClick' callback that will be passed on to SheetRow*/
 export function SheetTable(props) {
     const folder = props.folder
     const [sheets, setSheets] = useState(props.sheets)
@@ -29,7 +30,7 @@ export function SheetTable(props) {
 
 }
 
-/** @example <FoldersTable folders={ArrayOfFolders} onClick={function of what to do when a folder is clicked on} */
+/** requires 'folders' array of folders and an optional 'onClick' callback, that will be passed on to FolderRow */
 export function FoldersTable(props) {
     const [folders, setFolders] = useState(props.folders)
     const handleClick = props.onClick
