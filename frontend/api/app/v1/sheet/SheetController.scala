@@ -2,10 +2,12 @@ package v1.sheet
 
 import cats.implicits._
 import com.volk.stvsh.db.DBAccess._
-import com.volk.stvsh.db.objects.Sheet
+import com.volk.stvsh.db.objects.{ Sheet, SheetField }
 import com.volk.stvsh.db.objects.SheetField.SheetField
+import com.volk.stvsh.db.objects.folder.Folder
 import com.volk.stvsh.db.objects.folder.FolderAccess.{ CanReadSheets, CanWriteSheets }
-import com.volk.stvsh.db.objects.folder.Schema.Key
+import com.volk.stvsh.db.objects.folder.Schema.{ Key, ValueType }
+import com.volk.stvsh.db.Aliases.{ ID, SheetValues }
 import com.volk.stvsh.extensions.Play.{ ActionBuilderOps, EitherResultable }
 import com.volk.stvsh.extensions.PlayJson._
 import com.volk.stvsh.v1.SessionManagement._
@@ -48,7 +50,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
                 ifHasFolderAccess(CanWriteSheets)(existingSheet.folderId)(
                   _.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
                     case None          => BadRequest("Bad json").pure[ConnectionIO]
-                    case Some(preSave) => for { up <- Sheet.updateValues(existingSheet)(preSave.values) } yield up.toResult(_.toJson)
+                    case Some(preSave) => saveSheet(existingSheet.folderId)(preSave)
                   }
                 )(req)
             }
@@ -61,19 +63,31 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
     Action.asyncF {
       ifHasFolderAccess(CanWriteSheets)(folderId)(
         _.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
-          case None        => BadRequest("bad json value for a sheet").pure[ConnectionIO]
-          case Some(sheet) => Sheet.checkAndSave(sheet.toSheet(folderId = folderId)).map(_.toResult(_.toJson))
+          case None               => BadRequest("bad json value for a sheet").pure[ConnectionIO]
+          case Some(preSaveSheet) => saveSheet(folderId)(preSaveSheet)
         }
       ) andThen (_.perform)
     }
 
-}
+  /** creates a new sheet using given PreSaveSheet's values and ID as folder in which sheet is created.
+    * technically also checks that sheet follows folder structure (for more info see implementation of [[PreSaveSheet]]'s [[toSheet]])
+    * @return sheet already wrapped in an Ok(), or an error (aka BadRequest)
+    */
+  def saveSheet: ID => PreSaveSheet => ConnectionIO[Result] = folderId =>
+    pss => {
+      for {
+        folderOpt <- folderId.getFolder
+        res <-
+          folderOpt match {
+            case None =>
+              BadRequest(s"no folder with id $folderId").pure[ConnectionIO]
+            case Some(folder) =>
+              pss.toSheet(folder = folder) match {
+                case Left(error)  => BadRequest(error).pure[ConnectionIO]
+                case Right(sheet) => for { _ <- sheet.save } yield Ok(sheet.toJson)
+              }
+          }
+      } yield res
+    }
 
-case class PreSaveSheet(id: Option[String], folderId: Option[String], values: Map[Key, SheetField]) {
-  def toSheet(id: String = UUID.randomUUID().toString, folderId: String): Sheet =
-    Sheet(this.id.getOrElse(id), this.folderId.getOrElse(folderId), values)
-}
-
-object PreSaveSheet {
-  implicit def format: Format[PreSaveSheet] = Json.format
 }

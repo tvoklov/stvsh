@@ -81,44 +81,6 @@ object Sheet {
 
   def delete: Sheet => ConnectionIO[Int] = CRUD.delete(_).update.run
 
-  def checkAndSave: Sheet => ConnectionIO[Either[String, Sheet]] = {
-    case sheet @ Sheet(_, folderId, _) =>
-      for {
-        folder <- Folder.get(folderId)
-        res <-
-          folder match {
-            case None => Left("folder with given id not found").pure[ConnectionIO]
-            case Some(folder) =>
-              if (Sheet.validate(folder)(sheet.values))
-                save(sheet).map(
-                  _ => Right(sheet)
-                )
-              else Left("sheet violates folder structure").pure[ConnectionIO]
-          }
-      } yield res
-  }
-
-  /** updates the values of sheet with given id
-    * @return either the updated sheet OR the error that happened while updating
-    */
-  def updateValues: Sheet => SheetValues => ConnectionIO[Either[String, Sheet]] =
-    sheet =>
-      values =>
-        for {
-          f <- Folder.get(sheet.folderId)
-          ss <-
-            f match {
-              case None => Left("why is there a sheet with wrong folder id").pure[ConnectionIO]
-              case Some(v) =>
-                if (validate(v)(values)) {
-                  val newSheet = sheet.copy(values = values)
-                  save(newSheet).map(
-                    _ => Right(newSheet)
-                  )
-                } else Left("values violate sheet structure").pure[ConnectionIO]
-            }
-        } yield ss
-
   def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long]): ConnectionIO[List[Sheet]] = {
     val filters =
       List(
