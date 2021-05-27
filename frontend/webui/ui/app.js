@@ -67,12 +67,12 @@ function editSheet(folder, sheet, callback) {
 
 function submitCreateSheet(sheet, folderId, callback) {
     postToApi('/sheet/' + `?folderId=${folderId}`, sheet)
-        .then(res => res.json.then(sheet => callback(sheet)))
+        .then(res => res.json().then(sheet => callback(sheet)))
 }
 
 function submitUpdateSheet(sheet, callback) {
     putToApi('/sheet/' + `${sheet.id}`, sheet)
-        .then(res => res.json.then(sheet => callback(sheet)))
+        .then(res => res.json().then(sheet => callback(sheet)))
 }
 
 function cleanSheet() {
