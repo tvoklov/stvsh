@@ -32,6 +32,7 @@ export function PrettySheetView(props) {
                     {entriesTag}
                 </tbody>
             </table>
+            <button onClick={() => props.onEdit(sheet)}>Edit sheet</button>
         </div>
     )
 }

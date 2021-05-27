@@ -11,10 +11,11 @@ export function fetchFromApi(path, params) {
     }});
 }
 
-export function postToApi(path, body, params) {
-    return fetch('/v1' + path, {...param, ...{
+export function postToApi(path, body, params, headers) {
+    return fetch('/v1' + path, {...params, ...{
         method: 'POST',
         headers: {
+            'Content-Type': 'application/json',
             session: session
         },
         body: JSON.stringify(body)
@@ -25,6 +26,7 @@ export function putToApi(path, body, params) {
     return fetch('/v1' + path, {...param, ...{
         method: 'PUT',
         headers: {
+            'Content-Type': 'application/json',
             session: session
         },
         body: JSON.stringify(body)

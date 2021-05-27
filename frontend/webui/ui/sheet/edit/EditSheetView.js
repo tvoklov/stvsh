@@ -1,35 +1,33 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
-export function EditSheetView(props) {
-    const folder = props.folder
-    const [sheet, setSheet] = useState(props.sheet ? props.sheet : { values: {} })
+export function EditSheetView({ folder, sheet, onSubmit }) {
+    const f = ss => new Map(Object.entries(ss.values).map(([key, {value}]) => [key, value]))
 
-    const f = ss => Object.entries(ss.values).reduce((map, obj) => ( map[obj[0]] = obj[1].value, map ), {})
-
-    const [currentValues, setCurrentValues] = useState(props.sheet ? f(props.sheet) : [])
+    const [currentValues, setCurrentValues] = useState(sheet ? f(sheet) : new Map([]));
 
     const fields = Object.entries(folder.schema)
 
     const handleSubmit = () => {
-        props.onSubmit({...sheet, values: Object.fromEntries(currentValues)})
+        const values = Object.fromEntries(currentValues)
+        onSubmit({...sheet, values: values})
     }
 
     const handleChange = name => ({target}) => {
-        console.log(target.value)
-        setCurrentValues(prev => {
-            prev[name] = target.value
-            console.log(prev)
-            return prev
-        })
+        setCurrentValues(prev =>
+            new Map([
+                ...prev,
+                [name, target.value]
+            ])
+        );
     }
 
     return (
         <form>
             {
                 fields.map(([name, type]) => {
-                    const filledValue = currentValues[name]
-                    if (filledValue) { // for now everything is just text
-                        console.log(filledValue)
+                    const filledValue = currentValues.get[name]
+                    if (filledValue !== undefined) { // for now everything is just text
+                        console.log('rendering' + filledValue)
                         return (
                             <section key={name + filledValue.value}>
                                 <label htmlFor={name}>{name}</label>
@@ -37,11 +35,11 @@ export function EditSheetView(props) {
                             </section>
                         )
                     } else {
-                        console.log(currentValues)
+                        console.log('rendering empty')
                         return (
                             <section key={name + 'null'}>
                                 <label htmlFor={name}>{name}</label>
-                                <input type="text" name={name} value="" onChange={handleChange(name)}/>
+                                <input type="text" name={name} value={""} onChange={handleChange(name)}/>
                             </section>
                         )
                     }

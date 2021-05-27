@@ -45,7 +45,7 @@ function showFolder(id) {
 }
 
 function fullSheetTable(folder, sheets) {
-    const sheetTable = (<SheetTable key={folder.id} folder={folder} sheets={sheets} onClick={ sheet => showSheet(sheet.id) } onEdit={ sheet => editSheet(folder, sheet, newSheet => showFolder(folder.id)) }/>)
+    const sheetTable = (<SheetTable key={folder.id+(new Date())} folder={folder} sheets={sheets} onClick={ sheet => showSheet(sheet.id, folder) } />)
     const addFolderButton = (<button onClick={() => editSheet(folder, null, newSheet => showFolder(folder.id))} >Add sheet</button>)
 
     return (
@@ -62,7 +62,6 @@ function editSheet(folder, sheet, callback) {
         <EditSheetView key={ sheet === null ? "newsheet" : sheet.id } folder={folder} sheet={sheet} onSubmit={outerCallback}/>,
         document.getElementById('sheet')
     )
-    return 
 }
 
 function submitCreateSheet(sheet, folderId, callback) {
@@ -79,12 +78,12 @@ function cleanSheet() {
     ReactDOM.render(<p></p>, document.getElementById('sheet'));
 }
 
-function showSheet(id) {
+function showSheet(id, folder) {
     fetchFromApi('/sheet/' + id)
         .then(res => res.json().then(
             s => {
                 ReactDOM.render(
-                    <PrettySheetView key={s.id} sheet={s} />,
+                    <PrettySheetView key={s.id} sheet={s} onEdit={sheet => editSheet(folder, sheet, newSheet => showFolder(folder.id))} />,
                     document.getElementById('sheet')
                 );
             }

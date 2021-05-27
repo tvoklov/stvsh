@@ -62,7 +62,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
   def create: String => Action[AnyContent] = folderId =>
     Action.asyncF {
       ifHasFolderAccess(CanWriteSheets)(folderId)(
-        _.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
+        _.body.asJson.map(_.as[PreSaveSheet]) match {
           case None               => BadRequest("bad json value for a sheet").pure[ConnectionIO]
           case Some(preSaveSheet) => saveSheet(folderId)(preSaveSheet)
         }

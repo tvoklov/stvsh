@@ -25,7 +25,7 @@ export function SheetTable(props) {
             </thead>
             <tbody>
             {
-                sheets.map(sheet => <SheetRow key={sheet.id} schema={schema} sheet={sheet} onClick={handleClick} />)
+                sheets.map(sheet => <SheetRow key={sheet.id} schema={schema} sheet={sheet} onClick={handleClick} onEdit={props.onEdit}/>)
             }
             </tbody>
         </table>
