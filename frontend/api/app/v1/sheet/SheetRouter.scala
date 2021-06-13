@@ -16,5 +16,17 @@ class SheetRouter @Inject() (controller: SheetController) extends SimpleRouter {
 
     case PUT(p"/$id") =>
       controller.update(id)
+
+    // archiving a sheet
+    case PUT(p"/archive/$id") =>
+      controller.setArchive(true)(id)
+
+    // dearchiving a sheet
+    case DELETE(p"/archive/$id") =>
+      controller.setArchive(false)(id)
+
+    // fully removing a sheet
+    case DELETE(p"/$id") =>
+      controller.delete(id)
   }
 }

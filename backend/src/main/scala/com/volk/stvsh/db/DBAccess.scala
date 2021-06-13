@@ -40,8 +40,10 @@ object DBAccess {
     def delete: ConnectionIO[Int]                              = Folder.delete(folder.id)
     def getOwner: ConnectionIO[Option[User]]                   = User.get(folder.ownerId)
     def getUsers: ConnectionIO[List[(User, List[AccessType])]] = Folder.getAllUsersWithAccess(folder)
-    def getSheets(offset: Option[Long] = None, limit: Option[Long] = None): ConnectionIO[List[Sheet]] =
-      Sheet.findBy(Some(folder.id), offset, limit)
+
+    def getSheets(offset: Option[Long] = None, limit: Option[Long] = None, archived: Option[Boolean] = None): ConnectionIO[List[Sheet]] =
+      Sheet.findBy(Some(folder.id), offset, limit, archived)
+
     def allow(user: User, accessTypes: List[AccessType]): ConnectionIO[Int] =
       FolderAccess.allowAccess(user.id, accessTypes = accessTypes)(folder)
   }

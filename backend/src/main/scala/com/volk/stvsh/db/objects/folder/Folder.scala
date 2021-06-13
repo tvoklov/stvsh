@@ -49,6 +49,9 @@ object Folder {
         )
   }
 
+  def update(id: ID, name: Option[String], ownerId: Option[ID]): ConnectionIO[Int] =
+    CRUD.updateParts(id, name, ownerId)
+
   def findBy(
       ownerId: Option[String] = None,
       userId: Option[String] = None,
@@ -115,6 +118,18 @@ object Folder {
            |set ${fields.name} = '$name', ${fields.ownerId} = '$ownerId', ${fields.schema} = '${Json.toJson(schema).toString().fixForSql}'
            |where ${fields.id} = '$id'
            |""".stripMargin.toFragment.update.run
+    }
+
+    def updateParts(id: ID, name: Option[String], ownerId: Option[String]): ConnectionIO[Int] = {
+      val updateValues = List(
+        name.map(fields.name + " = '" + _ + "'"),
+        ownerId.map(fields.ownerId + " = '" + _ + "'")
+        ).flatten.mkString(", ")
+
+      s"""
+         |update $pgTable
+         |set $updateValues
+         |""".stripMargin.toFragment.update.run
     }
 
     def insert: Folder => ConnectionIO[Int] = {
