@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
 import { renderableSheetValue } from '../SheetValue'
 
-export function PrettySheetView(props) {
-    const [sheet, setSheet] = useState(props.sheet)
+export function PrettySheetView({ sheet, onEdit }) {
     const values = sheet.values
     const entries = Object.entries(values)
 
@@ -32,7 +31,7 @@ export function PrettySheetView(props) {
                     {entriesTag}
                 </tbody>
             </table>
-            <button onClick={() => props.onEdit(sheet)}>Edit sheet</button>
+            <button onClick={() => onEdit(sheet)}>Edit sheet</button>
         </div>
     )
 }

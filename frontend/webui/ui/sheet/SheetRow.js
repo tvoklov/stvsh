@@ -1,11 +1,7 @@
 import React, { useState } from 'react'
 
-export function SheetRow(props) {
-    const [sheet, setSheet] = useState(props.sheet)
-    
-    const handleClick = () => props.onClick(sheet)
-    const schema = props.schema
-
+export function SheetRow({sheet, schema, onClick}) {
+    const handleClick = () => onClick(sheet)
     const smap = Object.entries(sheet.values)
 
     return (

@@ -1,8 +1,8 @@
 import Cookies from 'js-cookie'
-import React from 'react'
+import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
 
-import { fetchFromApi, postToApi, putToApi } from './fetching'
+import { postToApi, putToApi } from './fetching'
 import { FolderTable } from './folder/FolderTable'
 import { SheetTable } from './sheet/SheetTable'
 import { PrettySheetView } from './sheet/view/PrettySheetView'
@@ -11,57 +11,95 @@ import { EditSheetView } from './sheet/edit/EditSheetView'
 const session = Cookies.get('session')
 let user = Cookies.get('user')
 
-if (session === undefined || session === "") {
-    const badSession = (
-        <section>
-            <h1>No session in cookies</h1>
-        </section>
-    );
-    ReactDOM.render(badSession, document.getElementById("folders"));
-} else {
-    fetchFromApi('/user/'+ user + "/folders", {})
-        .then(res => {
-            res.json().then(showFolders)
-        })
-}
+function App() {
+    const badSession = session === undefined || session === ""
 
-function showFolders(folders) {
-    ReactDOM.render(<FolderTable folders={folders} onClick={f => showFolder(f.id)} />, document.getElementById("folders"));
-}
+    if (badSession) {
+        return (
+            <section>
+                <h1>No session in cookies</h1>
+            </section>
+        );
+    }
 
-function showFolder(id) {
-    cleanSheet()
-    fetchFromApi('/folder/' + id)
-        .then(res => res.json().then(
-            f => {
-                fetchFromApi('/folder/' + id + '/sheets')
-                    .then(res => res.json().then( sheets => {
-                        ReactDOM.render(
-                            fullSheetTable(f, sheets),
-                            document.getElementById('sheets')
-                        );
-                    }))
-            }))
-}
+    const [lastTimeLoaded, setLastTimeLoaded] = useState(new Date())
 
-function fullSheetTable(folder, sheets) {
-    const sheetTable = (<SheetTable key={folder.id+(new Date())} folder={folder} sheets={sheets} onClick={ sheet => showSheet(sheet.id, folder) } />)
-    const addFolderButton = (<button onClick={() => editSheet(folder, null, newSheet => showFolder(folder.id))} >Add sheet</button>)
+    const [currentFolder, setCurrentFolder] = useState(null)
+    const [currentSheet, setCurrentSheet] = useState(null)
+
+    const [mode, setMode] = useState("viewing")
+
+    const handleFolderClick = folder => {
+        setCurrentFolder(folder)
+        setCurrentSheet(null)
+    }
+
+    const handleSheetClick = sheet => {
+        setCurrentSheet(sheet)
+        setMode('viewing')
+    }
+
+    const handleSheetEdit = sheet => {
+        setCurrentSheet(sheet)
+        setMode('editing')
+    }
+
+    const afterSave = () => {
+        setLastTimeLoaded(new Date())
+        setCurrentSheet(null)
+        setMode('viewing')
+    }
+
+    const sheetSection = !currentFolder ? (<></>) :
+        (<SheetTable
+            key={currentFolder.id + lastTimeLoaded}
+            folder={currentFolder}
+            onClick={handleSheetClick}
+        />)
 
     return (
-        <section>
-            {addFolderButton}
-            {sheetTable}
-        </section>
+        <div>
+            <FolderTable
+                key={lastTimeLoaded}
+                user={user}
+                onClick={handleFolderClick}
+            />
+            { !currentFolder ? <></> :
+                <section id="sheets">
+                    <button onClick={() => handleSheetEdit({})} >Add sheet</button> :
+                    {sheetSection}
+                </section>
+            }
+            <section id="sheet">
+                { !currentSheet ? <></> :
+                    toSheetView(mode, currentSheet, currentFolder, handleSheetEdit, afterSave)
+                }
+            </section>
+        </div>
     )
 }
 
-function editSheet(folder, sheet, callback) {
-    const outerCallback = sheet === null ? newSheet => submitCreateSheet(newSheet, folder.id, callback) : updatedSheet => submitUpdateSheet(updatedSheet, callback)
-    ReactDOM.render(
-        <EditSheetView key={ sheet === null ? "newsheet" : sheet.id } folder={folder} sheet={sheet} onSubmit={outerCallback}/>,
-        document.getElementById('sheet')
-    )
+function toSheetView(mode, sheet, folder, handleEdit, afterSave) {
+    switch (mode) {
+        case 'viewing':
+            return (
+                <PrettySheetView
+                    key={sheet.id}
+                    sheet={sheet}
+                    onEdit={handleEdit}
+                />
+            )
+        case 'editing':
+            const innerCallback = (sheet && sheet.id) ? updatedSheet => submitUpdateSheet(updatedSheet, afterSave) : newSheet => submitCreateSheet(newSheet, folder.id, afterSave);
+            return (
+                <EditSheetView
+                    key={(sheet && sheet.id) ? sheet.id : "newsheet" + (new Date())}
+                    folder={folder}
+                    sheet={sheet}
+                    onSubmit={innerCallback}
+                />
+            )
+    }
 }
 
 function submitCreateSheet(sheet, folderId, callback) {
@@ -74,18 +112,4 @@ function submitUpdateSheet(sheet, callback) {
         .then(res => res.json().then(sheet => callback(sheet)))
 }
 
-function cleanSheet() {
-    ReactDOM.render(<p></p>, document.getElementById('sheet'));
-}
-
-function showSheet(id, folder) {
-    fetchFromApi('/sheet/' + id)
-        .then(res => res.json().then(
-            s => {
-                ReactDOM.render(
-                    <PrettySheetView key={s.id} sheet={s} onEdit={sheet => editSheet(folder, sheet, newSheet => showFolder(folder.id))} />,
-                    document.getElementById('sheet')
-                );
-            }
-        ))
-}
+ReactDOM.render(<App />, document.getElementById('app'));

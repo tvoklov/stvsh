@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
 import { renderableSheetValue } from '../SheetValue'
 
-export function BasicSheetView(props) {
-    const [sheet, setSheet] = useState(props.sheet)
+export function BasicSheetView({sheet}) {
     const values = sheet.values
 
     return (

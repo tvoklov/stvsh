@@ -11,10 +11,7 @@ export function renderableSheetValue(sheetId, name, value) {
     }
 }
 
-function TextRow(props) {
-    const [value, setValue] = useState(props.value)
-    const name = props.name
-    
+function TextRow({ name, value}) {
     return (
         <tr>
             <td>{name}</td>
@@ -23,10 +20,7 @@ function TextRow(props) {
     )
 }
 
-function ImageRow(props) {
-    const [value, setValue] = useState(props.value)
-    const name = props.name
-
+function ImageRow({ name, value}) {
     return (
         <tr>
             <td>{name}</td>

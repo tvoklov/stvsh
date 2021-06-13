@@ -1,25 +1,40 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { FolderRow } from './FolderRow'
+import { fetchFromApi } from '../fetching'
 
-/** requires 'folders' array of folders and an optional 'onClick' callback, that will be passed on to FolderRow */
-export function FolderTable(props) {
-    const [folders, setFolders] = useState(props.folders)
-    const handleClick = props.onClick
+export function FolderTable({ user, onClick }) {
+    const [isLoaded, setIsLoaded] = useState(false)
+    const [page, setPage] = useState(1)
+    const [folders, setFolders] = useState([])
 
-    return (
-        <section>
-            <table>
-                <thead>
-                    <tr key="foldershead">
-                        <th key="folderheader">Folder</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {
-                        folders.map(f => <FolderRow key={f.id} folder={f} onClick={handleClick} />)
-                    }
-                </tbody>
-            </table>
-        </section>
-    )
+    useEffect(() => {
+        fetchFromApi('/user/' + user + "/folders", {})
+            .then(res => {
+                res.json().then(fs => {
+                    setFolders(fs)
+                    setIsLoaded(true)
+                })
+            })
+    }, [page])
+
+    if (!isLoaded) {
+        return (<p>Loading folders</p>)
+    } else {
+        return (
+            <section>
+                <table>
+                    <thead>
+                        <tr key="foldershead">
+                            <th key="folderheader">Folder</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {
+                            folders.map(f => <FolderRow key={f.id} folder={f} onClick={onClick} />)
+                        }
+                    </tbody>
+                </table>
+            </section>
+        )
+    }
 }

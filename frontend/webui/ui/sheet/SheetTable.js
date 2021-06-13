@@ -1,34 +1,44 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { SheetRow } from './SheetRow'
+import { fetchFromApi } from '../fetching'
 
-/** requires 'sheets' array of sheets, 'folder' and an optional 'onClick' callback that will be passed on to SheetRow*/
-export function SheetTable(props) {
-    const folder = props.folder
-    const [sheets, setSheets] = useState(props.sheets)
-    const handleClick = props.onClick
+export function SheetTable({ folder, onClick }) {
+    const [sheets, setSheets] = useState([])
+    const [isLoaded, setIsLoaded] = useState(false)
 
-    // const editable = props.editable
+    const [page, setPage] = useState(1)
+
+    useEffect(() => {
+        fetchFromApi('/folder/' + folder.id + '/sheets')
+            .then(res => res.json().then(ss => {
+                setSheets(ss)
+                setIsLoaded(true)
+            }))
+    }, [page])
+
     const editable = true
-    
     const schema = Object.entries(folder.schema)
 
-    return (
-        <table>
-            <thead>
-                <tr key='folderhead'>
-                {
-                    schema.map(([name, type]) =>
-                        <th key={name}>{name}</th>
-                    )
-                }
-                </tr>
-            </thead>
-            <tbody>
-            {
-                sheets.map(sheet => <SheetRow key={sheet.id} schema={schema} sheet={sheet} onClick={handleClick} onEdit={props.onEdit}/>)
-            }
-            </tbody>
-        </table>
-    )
-
+    if (!isLoaded) {
+        return (<p>Loading sheets...</p>)
+    } else {
+        return (
+            <table>
+                <thead>
+                    <tr key='folderhead'>
+                        {
+                            schema.map(([name, type]) =>
+                                <th key={name}>{name}</th>
+                            )
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    {
+                        sheets.map(sheet => <SheetRow key={sheet.id} schema={schema} sheet={sheet} onClick={onClick} />)
+                    }
+                </tbody>
+            </table>
+        )
+    }
 }
