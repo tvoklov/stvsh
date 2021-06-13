@@ -5,15 +5,15 @@ import com.volk.stvsh.db.Aliases.ID
 import com.volk.stvsh.db.DBAccess._
 import com.volk.stvsh.db.objects.Sheet
 import com.volk.stvsh.db.objects.folder.Folder
-import com.volk.stvsh.db.objects.folder.FolderAccess.{CanReadSheets, CanWriteSheets}
+import com.volk.stvsh.db.objects.folder.FolderAccess.{ CanEditFolder, CanReadSheets, CanWriteSheets }
 import com.volk.stvsh.db.objects.folder.Schema.FolderSchema
 import com.volk.stvsh.extensions.Play._
 import com.volk.stvsh.extensions.PlayJson._
 import com.volk.stvsh.v1.SessionManagement._
 import doobie.ConnectionIO
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.{ Format, Json }
 import play.api.mvc.Results.EmptyContent
-import play.api.mvc.{AbstractController, ControllerComponents, _}
+import play.api.mvc.{ AbstractController, ControllerComponents, _ }
 
 import java.util.UUID
 import javax.inject.Inject
@@ -46,7 +46,31 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
       )(request).perform
   }
 
-  def getSheets(id: String)(offset: Option[Long], limit: Option[Long], sortBy: Option[String]): Action[AnyContent] =
+  def update: String => Action[AnyContent] = id =>
+    Action.asyncF {
+      request =>
+        val cio = request.body.asJson.map(_.as[PreSaveFolder]) match {
+          case None => BadRequest("bad json value").pure[ConnectionIO]
+          case Some(f) =>
+            ifHasFolderAccess(CanReadSheets)(id)(
+              _ => // if hasFolderAccess => folder exists, so no need to check
+                for {
+                  _    <- Folder.update(id, Some(f.name), f.ownerId)
+                  newF <- Folder.get(id)
+                } yield Ok(newF.fold("")(_.toJsonString))
+            )(request)
+        }
+        cio.perform
+    }
+
+  def delete: String => Action[AnyContent] = id =>
+    Action.asyncF {
+      ifHasFolderAccess(CanEditFolder)(id)(
+        _ => for { _ <- Folder.delete(id) } yield Ok(id)
+      ) andThen (_.perform)
+    }
+
+  def getSheets(id: String)(offset: Option[Long], limit: Option[Long], sortBy: Option[String], archived: Option[Boolean]): Action[AnyContent] =
     Action.asyncF {
       ifHasFolderAccess(CanReadSheets)(id)(
         _ =>
@@ -54,7 +78,7 @@ class FolderController @Inject() (val cc: ControllerComponents) extends Abstract
             maybeFolder <- id.getFolder
             res <- maybeFolder match {
               case None    => NotFound("no folder with given id").pure[ConnectionIO]
-              case Some(f) => for { s <- f.getSheets(offset, limit) } yield Ok(s.toJson)
+              case Some(f) => for { s <- f.getSheets(offset, limit, archived) } yield Ok(s.toJson)
             }
           } yield res
       ) andThen (_.perform)
@@ -89,6 +113,6 @@ object PreSaveFolder {
   implicit val preSaveFolderJson: Format[PreSaveFolder] = Json.format
 }
 
-case class PreSaveFolder(id: Option[ID], name: String, ownerId: Option[ID], schema: FolderSchema) {
-  def toFolder(owner: ID): Folder = Folder(id.getOrElse(UUID.randomUUID().toString), name, ownerId.getOrElse(owner), schema)
+case class PreSaveFolder(id: Option[ID], name: String, ownerId: Option[ID], schema: Option[FolderSchema]) {
+  def toFolder(owner: ID): Folder = Folder(id.getOrElse(UUID.randomUUID().toString), name, ownerId.getOrElse(owner), schema.getOrElse(Map.empty))
 }

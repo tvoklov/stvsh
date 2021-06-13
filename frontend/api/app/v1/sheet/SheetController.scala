@@ -50,7 +50,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
                 ifHasFolderAccess(CanWriteSheets)(existingSheet.folderId)(
                   _.body.asJson.flatMap(_.asOpt[PreSaveSheet]) match {
                     case None          => BadRequest("Bad json").pure[ConnectionIO]
-                    case Some(preSave) => saveSheet(existingSheet.folderId)(preSave)
+                    case Some(preSave) => saveSheet(existingSheet.folderId, Some(id))(preSave)
                   }
                 )(req)
             }
@@ -69,11 +69,45 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
       ) andThen (_.perform)
     }
 
+  def setArchive(bool: Boolean): String => Action[AnyContent] = id =>
+    Action.asyncF {
+      request =>
+        val cio = for {
+          maybeSheet <- id.getSheet
+          res <- maybeSheet match {
+            case None => NotFound("").pure[ConnectionIO]
+            case Some(sheet) =>
+              ifHasFolderAccess(CanWriteSheets)(sheet.folderId)(
+                _ => for { _ <- Sheet.setArchived(bool)(sheet) } yield Ok(sheet.copy(isArchived = bool).toJson)
+              )(request)
+          }
+        } yield res
+
+        cio.perform
+    }
+
+  def delete: String => Action[AnyContent] = id =>
+    Action.asyncF {
+      req =>
+        val cio = for {
+          maybeSheet <- id.getSheet
+          res <- maybeSheet match {
+            case None => NotFound("").pure[ConnectionIO]
+            case Some(sheet) =>
+              ifHasFolderAccess(CanReadSheets)(sheet.folderId)(
+                _ => for { _ <- Sheet.delete(sheet) } yield Ok(sheet.id)
+              )(req)
+          }
+        } yield res
+
+        cio.perform
+    }
+
   /** creates a new sheet using given PreSaveSheet's values and ID as folder in which sheet is created.
     * technically also checks that sheet follows folder structure (for more info see implementation of [[PreSaveSheet]]'s [[toSheet]])
     * @return sheet already wrapped in an Ok(), or an error (aka BadRequest)
     */
-  def saveSheet: ID => PreSaveSheet => ConnectionIO[Result] = folderId =>
+  def saveSheet(folderId: ID, sheetId: Option[ID] = None): PreSaveSheet => ConnectionIO[Result] =
     pss => {
       for {
         folderOpt <- folderId.getFolder
@@ -82,7 +116,7 @@ class SheetController @Inject() (val cc: ControllerComponents) extends AbstractC
             case None =>
               BadRequest(s"no folder with id $folderId").pure[ConnectionIO]
             case Some(folder) =>
-              pss.toSheet(folder = folder) match {
+              pss.toSheet(sheetId.getOrElse(UUID.randomUUID().toString), folder = folder) match {
                 case Left(error)  => BadRequest(error).pure[ConnectionIO]
                 case Right(sheet) => for { _ <- sheet.save } yield Ok(sheet.toJson)
               }

@@ -52,5 +52,5 @@ case class PreSaveSheet(id: Option[String], folderId: Option[String], values: Ma
               )
         }
       }
-    } yield Sheet(this.id.getOrElse(id), this.folderId.getOrElse(folder.id), properValues)
+    } yield Sheet(this.id.getOrElse(id), this.folderId.getOrElse(folder.id), properValues, isArchived = false)
 }

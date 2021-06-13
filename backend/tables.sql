@@ -16,7 +16,8 @@ create table folder_access(
 create table sheet(
 	id varchar(36) primary key,
 	folder_id varchar(36),
-	value varchar
+	value varchar,
+	is_archived bool
 );
 create table sessions(
 	id varchar(36) primary key,

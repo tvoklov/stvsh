@@ -16,7 +16,8 @@ import java.util.UUID
 case class Sheet(
     id: ID,
     folderId: ID,
-    values: SheetValues
+    values: SheetValues,
+    isArchived: Boolean
 )
 
 object Sheet {
@@ -30,14 +31,15 @@ object Sheet {
     val id       = "id"
     val values   = "value"
     val folderId = "folder_id"
+    val isArchived = "is_archived"
   }
 
-  def apply(folder: Folder, values: Map[Key, SheetField]): Sheet =
-    Sheet(UUID.randomUUID().toString, folder.id, values)
+  def apply(folder: Folder, values: Map[Key, SheetField], isArchived: Boolean = false): Sheet =
+    Sheet(UUID.randomUUID().toString, folder.id, values, isArchived)
 
-  private def toSheet: ((ID, String, ID)) => Sheet = {
-    case (id, valuesJson, folderId) =>
-      Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]])
+  private def toSheet: ((ID, String, ID, Boolean)) => Sheet = {
+    case (id, valuesJson, folderId, isArchived) =>
+      Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]], isArchived)
   }
 
   def validate(folder: Folder): SheetValues => Boolean =
@@ -60,7 +62,7 @@ object Sheet {
   def get: ID => ConnectionIO[Option[Sheet]] =
     CRUD
       .select(_)
-      .query[(ID, String, ID)]
+      .query[(ID, String, ID, Boolean)]
       .option
       .map(_.map(toSheet))
 
@@ -79,12 +81,16 @@ object Sheet {
       )
   }
 
+  def setArchived(isArchived: Boolean): Sheet => ConnectionIO[Int] =
+    CRUD.setArchive(isArchived)(_).update.run
+
   def delete: Sheet => ConnectionIO[Int] = CRUD.delete(_).update.run
 
-  def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long]): ConnectionIO[List[Sheet]] = {
+  def findBy(folderId: Option[ID], offset: Option[Long], limit: Option[Long], archived: Option[Boolean]): ConnectionIO[List[Sheet]] = {
     val filters =
       List(
         folderId.map(fields.folderId + " = '" + _ + "'"),
+        archived.map(fields.isArchived + " = " + _)
       ).flatten.mkString("where ", " and ", "")
 
     val paging =
@@ -102,7 +108,7 @@ object Sheet {
          |""".stripMargin
 
     asFragment(sql)
-      .query[(ID, String, ID)]
+      .query[(ID, String, ID, Boolean)]
       .to[List]
       .map(_.map(toSheet))
   }
@@ -111,22 +117,23 @@ object Sheet {
     def select: ID => Fragment = asFragment compose {
       id =>
         s"""
-           |select ${fields.id}, ${fields.values}, ${fields.folderId} from $pgTable
+           |select ${fields.id}, ${fields.values}, ${fields.folderId}, ${fields.isArchived}
+           |from $pgTable
            |where ${fields.id} = '$id'
            |""".stripMargin
     }
 
     def insert: Sheet => Fragment = asFragment compose {
-      case Sheet(id, folderId, values) =>
+      case Sheet(id, folderId, values, isArchived) =>
         s"""
            |insert into $pgTable
-           |(${fields.id}, ${fields.folderId}, ${fields.values})
-           |values('$id', '$folderId', '${Json.toJson(values).toString().fixForSql}')
+           |(${fields.id}, ${fields.folderId}, ${fields.values}, ${fields.isArchived})
+           |values('$id', '$folderId', '${Json.toJson(values).toString().fixForSql}', $isArchived)
            |""".stripMargin
     }
 
     def update: Sheet => Fragment = asFragment compose {
-      case Sheet(id, _, values) =>
+      case Sheet(id, _, values, _) =>
         s"""
            |update $pgTable
            |set ${fields.values} = '${Json.toJson(values).toString().fixForSql}'
@@ -134,8 +141,17 @@ object Sheet {
            |""".stripMargin
     }
 
+    def setArchive: Boolean => Sheet => Fragment = isArchived => asFragment compose {
+      case Sheet(id, _, _, _) =>
+        s"""
+           |update $pgTable
+           |set ${fields.isArchived} = $isArchived
+           |where ${fields.id} = '$id'
+           |""".stripMargin
+    }
+
     def delete: Sheet => Fragment = asFragment compose {
-      case Sheet(id, _, _) =>
+      case Sheet(id, _, _, _) =>
         s"""
            |delete from $pgTable
            |where ${fields.id} = '$id'
