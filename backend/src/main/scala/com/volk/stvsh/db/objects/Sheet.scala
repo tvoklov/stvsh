@@ -37,9 +37,9 @@ object Sheet {
   def apply(folder: Folder, values: Map[Key, SheetField], isArchived: Boolean = false): Sheet =
     Sheet(UUID.randomUUID().toString, folder.id, values, isArchived)
 
-  private def toSheet: ((ID, String, ID, Boolean)) => Sheet = {
+  private def toSheet: ((ID, String, ID, Option[Boolean])) => Sheet = {
     case (id, valuesJson, folderId, isArchived) =>
-      Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]], isArchived)
+      Sheet(id, folderId, Json.parse(valuesJson).as[Map[Key, SheetField]], isArchived.getOrElse(false))
   }
 
   def validate(folder: Folder): SheetValues => Boolean =
@@ -62,7 +62,7 @@ object Sheet {
   def get: ID => ConnectionIO[Option[Sheet]] =
     CRUD
       .select(_)
-      .query[(ID, String, ID, Boolean)]
+      .query[(ID, String, ID, Option[Boolean])]
       .option
       .map(_.map(toSheet))
 
@@ -102,13 +102,13 @@ object Sheet {
 
     val sql =
       s"""
-         |select ${fields.id}, ${fields.values}, ${fields.folderId} from $pgTable
+         |select ${fields.id}, ${fields.values}, ${fields.folderId}, ${fields.isArchived} from $pgTable
          |$filters
          |$paging
          |""".stripMargin
 
     asFragment(sql)
-      .query[(ID, String, ID, Boolean)]
+      .query[(ID, String, ID, Option[Boolean])]
       .to[List]
       .map(_.map(toSheet))
   }

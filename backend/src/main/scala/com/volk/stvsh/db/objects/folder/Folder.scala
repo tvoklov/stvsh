@@ -129,6 +129,7 @@ object Folder {
       s"""
          |update $pgTable
          |set $updateValues
+         |where id = '$id'
          |""".stripMargin.toFragment.update.run
     }
 
